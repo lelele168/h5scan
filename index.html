@@ -15,7 +15,8 @@
         body { font-family: 'Segoe UI', Roboto, system-ui, sans-serif; background: #f3f6fc; min-height: 100vh; display: flex; justify-content: center; padding: 16px; }
         .app { max-width: 1000px; width: 100%; }
         .card { background: white; border-radius: 24px; padding: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        h1 { font-size: 1.8rem; font-weight: 600; margin-bottom: 8px; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+        h1 { font-size: 1.8rem; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px; }
         h2 { font-size: 1.3rem; font-weight: 500; margin: 20px 0 16px; color: #334155; }
         .tabs { display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; }
         .tab-btn { background: none; border: none; padding: 8px 16px; font-size: 1rem; border-radius: 40px; cursor: pointer; color: #64748b; transition: 0.2s; }
@@ -36,10 +37,14 @@
         .btn-sm { padding: 6px 14px; font-size: 0.9rem; }
         .flex-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .status-bar { display: flex; gap: 12px; align-items: center; }
         .sync-status { display: flex; align-items: center; gap: 8px; background: #f1f5f9; padding: 6px 16px; border-radius: 40px; font-size: 0.9rem; cursor: pointer; }
         .sync-status.online { color: #10b981; }
         .sync-status.offline { color: #ef4444; }
         .sync-status.syncing { color: #f59e0b; }
+        .sound-toggle { background: #f1f5f9; border: none; border-radius: 40px; padding: 6px 16px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .sound-toggle.on { color: #0284c7; }
+        .sound-toggle.off { color: #94a3b8; }
         .scanner-container { width: 100%; border-radius: 20px; overflow: hidden; background: #0f172a; margin: 20px 0; position: relative; }
         #interactive.viewport { position: relative; width: 100%; max-height: 350px; overflow: hidden; }
         #interactive.viewport video, #interactive.viewport canvas { width: 100%; height: auto; display: block; }
@@ -82,9 +87,12 @@
 <body>
 <div class="app">
     <div class="card">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div class="header-row">
             <h1>📦 快递扫码 · 智能识别版</h1>
-            <div id="syncStatus" class="sync-status online" title="点击立即同步">🟢 在线</div>
+            <div class="status-bar">
+                <button id="soundToggleBtn" class="sound-toggle on" title="声音提醒">🔊</button>
+                <div id="syncStatus" class="sync-status online" title="点击立即同步">🟢 在线</div>
+            </div>
         </div>
 
         <div id="userHeader" class="user-header">
@@ -204,7 +212,7 @@
         { name: '申通快递', regex: /^(777|772)\d{12}$/ },
         // 韵达：以46、43、31、32开头，后接11-13位数字（总长13-15位）
         { name: '韵达快递', regex: /^(46|43|31|32)\d{11,13}$/ },
-        // 极兔：JT + 13位数字，或JT315等变体（总长15位，JT后跟13位）
+        // 极兔：JT + 13位数字（总长15位）
         { name: '极兔快递', regex: /^JT\d{13}$/i },
         // EMS：以13开头，后接11位数字（总长13位）
         { name: 'EMS', regex: /^13\d{11}$/ },
@@ -223,7 +231,8 @@
 
     // 音频相关
     let audioCtx = null;
-    let audioEnabled = false;
+    let audioEnabled = false;          // 音频上下文是否激活（用户点击过页面）
+    let soundEnabled = true;           // 用户偏好：是否播放声音/震动（默认开启）
 
     // DOM 元素
     const syncStatusDiv = document.getElementById('syncStatus');
@@ -260,8 +269,37 @@
     const carrierStatsDiv = document.getElementById('carrierStats');
     const audioTip = document.getElementById('audioTip');
     const toast = document.getElementById('toast');
+    const soundToggleBtn = document.getElementById('soundToggleBtn');
 
-    // ================== 音频与震动 ==================
+    // ================== 声音开关 ==================
+    function loadSoundPreference() {
+        const saved = localStorage.getItem('soundEnabled');
+        if (saved !== null) {
+            soundEnabled = saved === 'true';
+        }
+        updateSoundButton();
+    }
+    function saveSoundPreference() {
+        localStorage.setItem('soundEnabled', soundEnabled);
+    }
+    function toggleSound() {
+        soundEnabled = !soundEnabled;
+        saveSoundPreference();
+        updateSoundButton();
+        showToast(soundEnabled ? '声音提醒已开启' : '声音提醒已关闭', 'success');
+    }
+    function updateSoundButton() {
+        if (soundEnabled) {
+            soundToggleBtn.className = 'sound-toggle on';
+            soundToggleBtn.innerHTML = '🔊';
+        } else {
+            soundToggleBtn.className = 'sound-toggle off';
+            soundToggleBtn.innerHTML = '🔇';
+        }
+    }
+    soundToggleBtn.addEventListener('click', toggleSound);
+
+    // ================== 音频与震动（受 soundEnabled 控制）==================
     function initAudio() {
         if (audioCtx) return;
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -283,6 +321,7 @@
     }
 
     function playBeep(type) {
+        if (!soundEnabled) return;                     // 用户关闭声音
         if (!audioCtx || audioCtx.state !== 'running') return;
         const now = audioCtx.currentTime;
         const osc = audioCtx.createOscillator();
@@ -305,6 +344,7 @@
     }
 
     function vibrate(type) {
+        if (!soundEnabled) return;                     // 用户关闭震动
         if (!navigator.vibrate) return;
         if (type === 'success') {
             navigator.vibrate(50);
@@ -720,11 +760,21 @@
         }
     }
 
-    // ================== 扫码初始化 ==================
+    // ================== 扫码初始化（修复暂停/开始逻辑）==================
     let quaggaInitialized = false;
+    let quaggaInitPending = false;   // 防止重复初始化
 
-    function initScanner() {
-        if (quaggaInitialized) return;
+    function initScanner(callback) {
+        if (quaggaInitialized) {
+            if (callback) callback(true);
+            return;
+        }
+        if (quaggaInitPending) {
+            // 如果正在初始化，等待完成
+            setTimeout(() => initScanner(callback), 200);
+            return;
+        }
+        quaggaInitPending = true;
         Quagga.init({
             inputStream: {
                 name: "Live",
@@ -744,28 +794,29 @@
                 ]
             }
         }, function(err) {
+            quaggaInitPending = false;
             if (err) {
                 console.error('扫码器初始化失败:', err);
                 showToast('无法启动摄像头，请检查权限', 'error');
+                if (callback) callback(false);
                 return;
             }
             quaggaInitialized = true;
             console.log('扫码器就绪');
+            if (callback) callback(true);
         });
     }
 
     function startScanner() {
+        if (!currentUser) return;
         if (!quaggaInitialized) {
-            initScanner();
-            setTimeout(() => {
-                if (quaggaInitialized) {
+            initScanner((success) => {
+                if (success) {
                     Quagga.start();
                     isScanning = true;
                     updateScanButtons();
-                } else {
-                    showToast('扫码初始化失败，请刷新重试', 'error');
                 }
-            }, 800);
+            });
         } else {
             Quagga.start();
             isScanning = true;
@@ -791,6 +842,7 @@
         }
     }
 
+    // 绑定扫码检测事件（只需绑定一次）
     Quagga.onDetected(function(result) {
         if (!isScanning || !currentUser) return;
         const code = result.codeResult.code;
@@ -822,11 +874,11 @@
         userInfoDiv.innerText = `👤 ${user.email}`;
         sessionStartTime = new Date();
         loadPendingFromStorage();
-        initScanner();
         loadMergedHistory();
         updateSyncStatusUI();
         initAudio();
-        updateScanButtons();
+        updateScanButtons();  // 默认显示“开始扫码”
+        // 不自动启动扫码
     }
 
     sbClient.auth.onAuthStateChange((event, session) => {
@@ -994,9 +1046,10 @@
         XLSX.writeFile(workbook, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
-    // 初始化加载本地存储
+    // 初始化
     loadPendingFromStorage();
-    initAudio();
+    loadSoundPreference();
+    initAudio(); // 初始化音频上下文，但不激活
 </script>
 </body>
 </html>
