@@ -157,7 +157,7 @@
                 <div class="carrier-stats" id="carrierStats"></div>
             </div>
 
-            <!-- 工具栏：搜索 + 范围清空 -->
+            <!-- 工具栏：搜索 + 范围清空 + 导出按钮（确保可见） -->
             <div class="toolbar">
                 <input type="text" id="searchInput" class="search-box" placeholder="🔍 搜索单号或快递公司...">
                 <select id="clearRangeSelect" class="clear-select">
@@ -167,6 +167,11 @@
                     <option value="all">全部</option>
                 </select>
                 <button id="clearRangeBtn" class="btn btn-danger">🗑️ 清空所选范围</button>
+                <!-- 导出按钮组 -->
+                <div style="display: flex; gap: 8px; margin-left: auto;">
+                    <button id="exportCsvBtn" class="btn export-btn">📥 CSV</button>
+                    <button id="exportXlsxBtn" class="btn btn-success">📊 XLSX</button>
+                </div>
             </div>
 
             <!-- 数据表格 -->
@@ -793,7 +798,6 @@
             return;
         }
         if (quaggaInitPending) {
-            // 等待初始化完成
             setTimeout(() => initScanner(callback), 200);
             return;
         }
@@ -830,23 +834,26 @@
         });
     }
 
-    // 确保扫码正在运行（如果已停止则启动）
-    function ensureScannerRunning() {
+    // 启动扫码（确保先停止可能残留的流，再启动）
+    function startScanner() {
+        if (!currentUser) return;
+
+        const doStart = () => {
+            // 先确保 Quagga 停止（避免冲突）
+            try { Quagga.stop(); } catch (e) {}
+            Quagga.start();
+            isScanning = true;
+            updateScanButtons();
+        };
+
         if (!quaggaInitialized) {
             initScanner((success) => {
                 if (success) {
-                    Quagga.start();
-                    isScanning = true;
-                    updateScanButtons();
+                    doStart();
                 }
             });
         } else {
-            // 如果已初始化但未运行，则启动
-            if (!isScanning) {
-                Quagga.start();
-                isScanning = true;
-                updateScanButtons();
-            }
+            doStart();
         }
     }
 
@@ -982,8 +989,7 @@
         if (e.key === 'Enter') manualSubmit.click();
     });
 
-    // 点击开始扫码时确保扫码运行
-    startScanBtn.addEventListener('click', ensureScannerRunning);
+    startScanBtn.addEventListener('click', startScanner);
     pauseScanBtn.addEventListener('click', pauseScanner);
 
     searchInput.addEventListener('input', applyFilter);
