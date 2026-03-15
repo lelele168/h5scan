@@ -923,7 +923,7 @@
     }
     soundToggleBtn.addEventListener('click', toggleSound);
 
-    // ================== 语音朗读（调整速度与音调）==================
+    // ================== 语音朗读（速度与音调已调高）==================
     function speak(text) {
         if (!speechEnabled) {
             console.log('语音已关闭，不朗读:', text);
@@ -1737,7 +1737,7 @@
         if (code) handleTrackingNumber(code);
     });
 
-    // ================== 用户认证 ==================
+    // ================== 用户认证（登录后自动同步本地记录）==================
     function showAuth() {
         authArea.style.display = 'block';
         mainApp.style.display = 'none';
@@ -1782,7 +1782,13 @@
         sessionStartTime = new Date();
         userInfoDiv.innerText = `👤 ${user.email}`;
         showApp();
-        loadCloudData();
+        // 自动将本地待同步记录上传到云端
+        if (pendingRecords.length > 0) {
+            speak('开始同步本地记录');
+            await syncPendingRecords();
+        } else {
+            loadCloudData();
+        }
     }
 
     function enterLocalMode() {
