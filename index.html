@@ -157,7 +157,7 @@
                 <div class="carrier-stats" id="carrierStats"></div>
             </div>
 
-            <!-- 工具栏：搜索 + 范围清空 + 导出按钮（确保可见） -->
+            <!-- 工具栏：搜索 + 范围清空 + 导出按钮 -->
             <div class="toolbar">
                 <input type="text" id="searchInput" class="search-box" placeholder="🔍 搜索单号或快递公司...">
                 <select id="clearRangeSelect" class="clear-select">
@@ -207,21 +207,13 @@
 
     // ================== 快递公司识别规则（基于实际数据优化）==================
     const carrierRules = [
-        // 顺丰：SF + 13位数字（总长15位）
         { name: '顺丰快递', regex: /^SF\d{13}$/i },
-        // 圆通：YT + 13位数字（总长15位）
         { name: '圆通快递', regex: /^YT\d{13}$/i },
-        // 中通：14位纯数字（样本73598902303422为14位）
         { name: '中通快递', regex: /^\d{14}$/ },
-        // 申通：以777或772开头，后接12位数字（总长15位）
         { name: '申通快递', regex: /^(777|772)\d{12}$/ },
-        // 韵达：以46、43、31、32开头，后接11-13位数字（总长13-15位）
         { name: '韵达快递', regex: /^(46|43|31|32)\d{11,13}$/ },
-        // 极兔：JT + 13位数字（总长15位）
         { name: '极兔快递', regex: /^JT\d{13}$/i },
-        // EMS：以13开头，后接11位数字（总长13位）
         { name: 'EMS', regex: /^13\d{11}$/ },
-        // 邮政快递：以98或82开头，后接11位数字（总长13位）
         { name: '邮政快递', regex: /^(98|82)\d{11}$/ }
     ];
 
@@ -236,8 +228,8 @@
 
     // 音频相关
     let audioCtx = null;
-    let audioEnabled = false;          // 音频上下文是否激活（用户点击过页面）
-    let soundEnabled = true;           // 用户偏好：是否播放声音/震动（默认开启）
+    let audioEnabled = false;
+    let soundEnabled = true;
 
     // DOM 元素
     const syncStatusDiv = document.getElementById('syncStatus');
@@ -304,11 +296,10 @@
     }
     soundToggleBtn.addEventListener('click', toggleSound);
 
-    // ================== 音频与震动（受 soundEnabled 控制）==================
+    // ================== 音频与震动 ==================
     function initAudio() {
         if (audioCtx) return;
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        // 全局点击激活音频
         const enableAudio = () => {
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume().then(() => {
@@ -326,7 +317,6 @@
         document.addEventListener('touchstart', enableAudio);
     }
 
-    // 尝试恢复音频上下文（每次播放前调用）
     async function ensureAudio() {
         if (!audioCtx) return false;
         if (audioCtx.state === 'suspended') {
@@ -344,9 +334,9 @@
     }
 
     async function playBeep(type) {
-        if (!soundEnabled) return;                     // 用户关闭声音
+        if (!soundEnabled) return;
         if (!audioCtx) return;
-        await ensureAudio();                            // 确保音频已激活
+        await ensureAudio();
         if (audioCtx.state !== 'running') return;
         const now = audioCtx.currentTime;
         const osc = audioCtx.createOscillator();
@@ -369,7 +359,7 @@
     }
 
     function vibrate(type) {
-        if (!soundEnabled) return;                     // 用户关闭震动
+        if (!soundEnabled) return;
         if (!navigator.vibrate) return;
         if (type === 'success') {
             navigator.vibrate(50);
@@ -378,7 +368,6 @@
         }
     }
 
-    // 显示 Toast 消息
     function showToast(message, type = 'success', duration = 2000) {
         toast.className = `toast-message show ${type}`;
         toast.textContent = message;
@@ -513,7 +502,6 @@
         applyFilter();
     }
 
-    // 统计
     function renderStats(records) {
         totalCountSpan.innerText = records.length;
         const uniqueNumbers = new Set(records.map(r => r.tracking_number));
@@ -530,7 +518,6 @@
         ).join('');
     }
 
-    // 过滤与渲染
     function applyFilter() {
         const keyword = searchInput.value.trim().toLowerCase();
         let filtered = allRecords;
@@ -614,7 +601,6 @@
         updateSyncStatusUI();
     }
 
-    // 查找单号最近一次扫描时间
     function findLastScanTime(trackingNumber) {
         const records = allRecords.filter(r => r.tracking_number === trackingNumber);
         if (records.length === 0) return null;
@@ -703,12 +689,11 @@
         });
     }
 
-    // 识别快递公司，返回公司名或 null（无效）
     function detectCarrier(trackingNumber) {
         for (let rule of carrierRules) {
             if (rule.regex.test(trackingNumber)) return rule.name;
         }
-        return null; // 无匹配则无效
+        return null;
     }
 
     async function saveScan(trackingNumber, carrier, notes = '') {
@@ -745,14 +730,11 @@
         }
     }
 
-    // 处理扫描/输入的单号
     async function handleTrackingNumber(trackingNumber) {
-        // 尝试激活音频（如果用户已开启声音）
         if (soundEnabled) await ensureAudio();
 
         const carrier = detectCarrier(trackingNumber);
         
-        // 无效条码处理
         if (carrier === null) {
             playBeep('error');
             vibrate('error');
@@ -761,24 +743,19 @@
             return;
         }
 
-        // 查找上次扫描时间
         const lastTime = findLastScanTime(trackingNumber);
         const isDuplicate = lastTime !== null;
         
-        // 保存记录
         await saveScan(trackingNumber, carrier);
         
-        // 播放成功音
         playBeep('success');
         vibrate('success');
 
-        // 显示最新结果
         currentResult.style.display = 'block';
         trackingSpan.innerText = trackingNumber;
         carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
         scannedAtSpan.innerText = new Date().toLocaleString();
 
-        // 显示重复提示
         if (isDuplicate) {
             duplicateHint.innerText = `⏰ 上次扫描：${lastTime.toLocaleString()}`;
             showToast('📦 重复扫描，已保存', 'warning');
@@ -788,15 +765,11 @@
         }
     }
 
-    // ================== 扫码初始化（修复暂停/开始）==================
+    // ================== 扫码初始化（修复暂停后重新开始）==================
     let quaggaInitialized = false;
     let quaggaInitPending = false;
 
     function initScanner(callback) {
-        if (quaggaInitialized) {
-            if (callback) callback(true);
-            return;
-        }
         if (quaggaInitPending) {
             setTimeout(() => initScanner(callback), 200);
             return;
@@ -834,36 +807,31 @@
         });
     }
 
-    // 启动扫码：确保先停止可能残留的流，再启动
     function startScanner() {
         if (!currentUser) return;
 
-        const doStart = () => {
-            try {
-                // 如果正在扫描，先停止（避免冲突）
-                if (isScanning) {
-                    Quagga.stop();
-                    isScanning = false;
-                }
-                Quagga.start();
-                isScanning = true;
-                updateScanButtons();
-                showToast('扫码已启动', 'success');
-            } catch (err) {
-                console.error('启动扫码失败', err);
+        // 无论当前状态如何，先尝试停止任何正在运行的流
+        try {
+            Quagga.stop();
+        } catch (e) {}
+
+        // 重置初始化标志，强制重新初始化
+        quaggaInitialized = false;
+        quaggaInitPending = false;
+
+        initScanner((success) => {
+            if (success) {
+                // 短暂延迟后启动，确保流准备就绪
+                setTimeout(() => {
+                    Quagga.start();
+                    isScanning = true;
+                    updateScanButtons();
+                    showToast('扫码已启动', 'success');
+                }, 100);
+            } else {
                 showToast('启动摄像头失败，请重试', 'error');
             }
-        };
-
-        if (!quaggaInitialized) {
-            initScanner((success) => {
-                if (success) {
-                    doStart();
-                }
-            });
-        } else {
-            doStart();
-        }
+        });
     }
 
     function pauseScanner() {
@@ -885,7 +853,7 @@
         }
     }
 
-    // 绑定扫码检测事件（只需绑定一次）
+    // 绑定扫码检测事件（只绑定一次）
     Quagga.onDetected(function(result) {
         if (!isScanning || !currentUser) return;
         const code = result.codeResult.code;
@@ -919,9 +887,8 @@
         loadPendingFromStorage();
         loadMergedHistory();
         updateSyncStatusUI();
-        initAudio();               // 初始化音频上下文（但不激活）
-        updateScanButtons();        // 默认显示“开始扫码”
-        // 不自动启动扫码
+        initAudio();
+        updateScanButtons();
     }
 
     sbClient.auth.onAuthStateChange((event, session) => {
@@ -1092,7 +1059,7 @@
     // 初始化
     loadPendingFromStorage();
     loadSoundPreference();
-    initAudio(); // 初始化音频上下文，但不激活
+    initAudio();
 </script>
 </body>
 </html>
