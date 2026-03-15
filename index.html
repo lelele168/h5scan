@@ -11,7 +11,7 @@
     <!-- SheetJS 用于导出 XLSX -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* 样式与之前保持一致，仅增加大图模态框 */
+        /* 样式与之前保持一致，仅作微调 */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -550,12 +550,11 @@
     </div>
 </div>
 
-<!-- 搜索模态框 -->
+<!-- 搜索模态框（已移除扫码搜索按钮） -->
 <div id="searchModal" class="modal">
     <div class="modal-content">
         <h3>🔍 搜索记录</h3>
         <input type="text" id="searchInput" placeholder="输入单号或快递公司" autocomplete="off">
-        <div style="display: flex; gap:12px; margin-bottom:20px;"><button id="scanSearchBtn" class="btn btn-success">📷 扫码搜索</button></div>
         <div class="modal-buttons"><button id="searchModalCancel" class="btn">取消</button><button id="searchModalConfirm" class="btn btn-primary">搜索</button></div>
     </div>
 </div>
@@ -672,7 +671,6 @@
     const manualModalConfirm = document.getElementById('manualModalConfirm');
     const searchModal = document.getElementById('searchModal');
     const searchInput = document.getElementById('searchInput');
-    const scanSearchBtn = document.getElementById('scanSearchBtn');
     const searchModalCancel = document.getElementById('searchModalCancel');
     const searchModalConfirm = document.getElementById('searchModalConfirm');
     const detailModal = document.getElementById('detailModal');
@@ -795,7 +793,7 @@
     manualModalInput.addEventListener('keypress', e => { if (e.key === 'Enter') manualModalConfirm.click(); });
     manualModal.addEventListener('click', e => { if (e.target === manualModal) manualModal.classList.remove('show'); });
 
-    // ================== 搜索 ==================
+    // ================== 搜索（已移除扫码搜索）==================
     searchBtn.addEventListener('click', () => {
         searchInput.value = '';
         searchModal.classList.add('show');
@@ -808,27 +806,6 @@
         applyDataSource();
     });
     searchInput.addEventListener('keypress', e => { if (e.key === 'Enter') searchModalConfirm.click(); });
-    scanSearchBtn.addEventListener('click', () => {
-        const wasScanning = isScanning;
-        if (wasScanning) pauseScanner();
-        Quagga.init({
-            inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#interactive'), constraints: { width: 640, height: 480, facingMode: "environment" } },
-            decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","code_39_reader","codabar_reader","upc_reader","i2of5_reader"] }
-        }, (err) => {
-            if (err) { showToast('无法启动摄像头', 'error'); return; }
-            Quagga.start(); showToast('请扫描条码', 'info');
-            const onDetected = (result) => {
-                const code = result.codeResult.code;
-                if (code) {
-                    Quagga.stop();
-                    Quagga.offDetected(onDetected);
-                    searchInput.value = code;
-                    if (wasScanning) startScanner();
-                }
-            };
-            Quagga.onDetected(onDetected);
-        });
-    });
     searchModal.addEventListener('click', e => { if (e.target === searchModal) searchModal.classList.remove('show'); });
 
     // ================== 详情模态框（带图片放大）==================
@@ -867,6 +844,9 @@
                 if (confirm('确定删除这条记录？')) {
                     await deleteRecord(localId, cloudId);
                     detailModal.classList.remove('show');
+                    // 删除后重新应用数据源，表格实时更新
+                    applyDataSource();
+                    updateSyncStatusUI();
                 }
             });
         });
