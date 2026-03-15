@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>快递扫码系统 · 语音版</title>
+    <title>快递扫码系统 · 备注锁定版</title>
     <!-- QuaggaJS 扫码库 -->
     <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <!-- Supabase JS 客户端 -->
@@ -51,6 +51,11 @@
         .scanner-controls { display: flex; gap: 10px; margin: 10px 0; justify-content: center; }
         .manual-section { display: flex; gap: 10px; margin: 20px 0; }
         .manual-section input { flex: 1; padding: 14px 18px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; }
+        .note-section { display: flex; gap: 10px; margin: 10px 0; align-items: center; }
+        .note-section input { flex: 1; padding: 14px 18px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; }
+        .lock-toggle { background: #f1f5f9; border: none; border-radius: 40px; padding: 6px 16px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .lock-toggle.locked { color: #0284c7; }
+        .lock-toggle.unlocked { color: #94a3b8; }
         .result-card { background: #e6f7ff; padding: 16px; border-radius: 20px; margin: 20px 0; border-left: 6px solid #0284c7; transition: all 0.3s; }
         .result-card.invalid { border-left-color: #ef4444; background: #fee2e2; }
         .carrier-badge { background: #0284c7; color: white; padding: 4px 14px; border-radius: 40px; font-size: 0.85rem; display: inline-block; font-weight: 500; }
@@ -89,7 +94,7 @@
 <div class="app">
     <div class="card">
         <div class="header-row">
-            <h1>📦 快递扫码 · 语音版</h1>
+            <h1>📦 快递扫码 · 备注锁定版</h1>
             <div class="status-bar">
                 <button id="soundToggleBtn" class="sound-toggle on" title="声音提醒">🔊</button>
                 <div id="syncStatus" class="sync-status online" title="点击立即同步">🟢 在线</div>
@@ -135,6 +140,12 @@
             <div class="manual-section">
                 <input type="text" id="manualInput" placeholder="手动输入单号">
                 <button id="manualSubmit" class="btn btn-primary">登记</button>
+            </div>
+
+            <!-- 备注输入及锁定 -->
+            <div class="note-section">
+                <input type="text" id="noteInput" placeholder="备注（可留空）" value="">
+                <button id="lockToggleBtn" class="lock-toggle unlocked" title="锁定备注，后续扫码自动使用">🔓</button>
             </div>
 
             <div id="currentResult" class="result-card" style="display: none;">
@@ -192,10 +203,10 @@
             <p id="noDataMsg" style="color:#94a3b8; text-align:center; padding:30px;">暂无记录</p>
         </div>
     </div>
-    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 语音提示</div>
+    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 备注锁定</div>
 </div>
 
-<!-- 全局 Toast 提示（用于一般信息） -->
+<!-- 全局 Toast 提示 -->
 <div id="toast" class="toast-message"></div>
 <!-- 扫码单号临时显示 -->
 <div id="scanToast" class="scan-toast"></div>
@@ -207,23 +218,14 @@
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // ================== 快递公司识别规则 ==================
-    // 根据实际数据精确匹配
     const carrierRules = [
-        // 顺丰：SF + 13位数字（总长15位）
         { name: '顺丰快递', regex: /^SF\d{13}$/i },
-        // 圆通：YT + 13位数字（总长15位）
         { name: '圆通快递', regex: /^YT\d{13}$/i },
-        // 中通：仅匹配以73、75、78开头的14位纯数字（根据你提供的最新数据）
-        { name: '中通快递', regex: /^(73|75|78)\d{11}$/ },
-        // 申通：以777或772开头，后接12位数字（总长15位）
+        { name: '中通快递', regex: /^(73|75|78)\d{11}$/ },  // 14位纯数字，以73/75/78开头
         { name: '申通快递', regex: /^(777|772)\d{12}$/ },
-        // 韵达：以46、43、31、32开头，后接11-13位数字（总长13-15位）
         { name: '韵达快递', regex: /^(46|43|31|32)\d{11,13}$/ },
-        // 极兔：JT + 13位数字（总长15位）
         { name: '极兔快递', regex: /^JT\d{13}$/i },
-        // EMS：以13开头，后接11位数字（总长13位）
         { name: 'EMS', regex: /^13\d{11}$/ },
-        // 邮政快递：以98或82开头，后接11位数字（总长13位）
         { name: '邮政快递', regex: /^(98|82)\d{11}$/ }
     ];
 
@@ -239,6 +241,10 @@
     // 语音相关
     let speechEnabled = true;           // 是否朗读（跟随声音开关）
     let soundEnabled = true;            // 用户偏好：是否播放声音/震动（默认开启）
+
+    // 备注锁定相关
+    let noteLocked = false;             // 是否锁定备注
+    let lockedNote = '';                // 锁定的备注内容
 
     // DOM 元素
     const syncStatusDiv = document.getElementById('syncStatus');
@@ -256,6 +262,8 @@
     const signupError = document.getElementById('signupError');
     const manualInput = document.getElementById('manualInput');
     const manualSubmit = document.getElementById('manualSubmit');
+    const noteInput = document.getElementById('noteInput');
+    const lockToggleBtn = document.getElementById('lockToggleBtn');
     const currentResult = document.getElementById('currentResult');
     const trackingSpan = document.getElementById('trackingNumber');
     const carrierSpan = document.getElementById('carrier');
@@ -283,6 +291,7 @@
         if (saved !== null) {
             soundEnabled = saved === 'true';
         }
+        speechEnabled = soundEnabled;
         updateSoundButton();
     }
     function saveSoundPreference() {
@@ -290,7 +299,7 @@
     }
     function toggleSound() {
         soundEnabled = !soundEnabled;
-        speechEnabled = soundEnabled;   // 语音跟随声音开关
+        speechEnabled = soundEnabled;
         saveSoundPreference();
         updateSoundButton();
         showToast(soundEnabled ? '声音提醒已开启' : '声音提醒已关闭', 'success');
@@ -320,10 +329,10 @@
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'zh-CN';
-        utterance.rate = 0.9;          // 语速稍慢
-        utterance.pitch = 1.2;          // 音调稍高，更像女声（取决于具体语音）
+        utterance.rate = 0.9;
+        utterance.pitch = 1.2;
         utterance.volume = 1;
-        // 尝试选择女性声音（如果有）
+        // 尝试选择女性声音
         const voices = window.speechSynthesis.getVoices();
         const femaleVoice = voices.find(voice => voice.lang.includes('zh') && voice.name.includes('Female'));
         if (femaleVoice) {
@@ -363,6 +372,47 @@
             scanToast.classList.remove('show');
         }, 2000);
     }
+
+    // ================== 备注锁定功能 ==================
+    function updateLockUI() {
+        if (noteLocked) {
+            lockToggleBtn.className = 'lock-toggle locked';
+            lockToggleBtn.innerHTML = '🔒';
+            noteInput.disabled = true;
+            // 锁定状态下，备注输入框显示锁定的内容
+            noteInput.value = lockedNote;
+        } else {
+            lockToggleBtn.className = 'lock-toggle unlocked';
+            lockToggleBtn.innerHTML = '🔓';
+            noteInput.disabled = false;
+            // 解锁时，备注输入框保持原有内容（不清空）
+        }
+    }
+
+    function toggleLock() {
+        if (noteLocked) {
+            // 解锁：将锁定状态解除，输入框恢复可编辑
+            noteLocked = false;
+            // 解锁时不清空输入框，保留当前值
+        } else {
+            // 锁定：将当前输入框内容作为锁定备注，输入框禁用
+            lockedNote = noteInput.value;
+            noteLocked = true;
+        }
+        updateLockUI();
+        showToast(noteLocked ? '备注已锁定' : '备注已解锁', 'success');
+    }
+
+    // 获取当前要使用的备注（根据锁定状态）
+    function getCurrentNote() {
+        if (noteLocked) {
+            return lockedNote;
+        } else {
+            return noteInput.value;
+        }
+    }
+
+    lockToggleBtn.addEventListener('click', toggleLock);
 
     // ================== 本地存储 ==================
     const STORAGE_KEY = 'pending_scans';
@@ -718,12 +768,11 @@
         }
     }
 
-    // ================== 处理扫码结果（语音+临时显示）==================
+    // ================== 处理扫码结果（语音+临时显示+备注）==================
     async function handleTrackingNumber(trackingNumber) {
         // 防重判断（5秒内相同单号不处理）
         const now = Date.now();
         if (trackingNumber === lastScannedCode && (now - lastScanTime) < 5000) {
-            // 重复扫码，播放语音“重复”
             speak('重复');
             vibrate('repeat');
             showToast('⚠️ 5秒内重复扫码，已忽略', 'warning');
@@ -745,16 +794,19 @@
             return;
         }
 
+        // 获取当前备注
+        const note = getCurrentNote();
+
         // 查找上次扫描时间（用于重复提示）
         const lastTime = findLastScanTime(trackingNumber);
         const isDuplicate = lastTime !== null;
         
-        // 保存记录
-        await saveScan(trackingNumber, carrier);
+        // 保存记录（传入备注）
+        await saveScan(trackingNumber, carrier, note);
         
         // 播放语音和震动
         if (isDuplicate) {
-            speak('重复');       // 重复时也朗读“重复”，但保存了记录
+            speak('重复');
             vibrate('repeat');
         } else {
             speak('成功');
@@ -769,6 +821,8 @@
         trackingSpan.innerText = trackingNumber;
         carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
         scannedAtSpan.innerText = new Date().toLocaleString();
+        // 在结果卡片中显示备注（可选）
+        // 如果需要在卡片中显示备注，可以添加一行，但现有卡片无备注字段，暂不修改
 
         if (isDuplicate) {
             duplicateHint.innerText = `⏰ 上次扫描：${lastTime.toLocaleString()}`;
@@ -892,6 +946,7 @@
         loadMergedHistory();
         updateSyncStatusUI();
         updateScanButtons();
+        // 备注默认为空，解锁状态，已由HTML默认处理
     }
 
     sbClient.auth.onAuthStateChange((event, session) => {
@@ -1062,8 +1117,7 @@
     // 初始化
     loadPendingFromStorage();
     loadSoundPreference();
-
-    // 预加载语音列表（某些浏览器需要）
+    // 预加载语音列表
     if (window.speechSynthesis) {
         window.speechSynthesis.getVoices();
     }
