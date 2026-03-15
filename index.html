@@ -11,7 +11,7 @@
     <!-- SheetJS 用于导出 XLSX -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* 样式 - 保持与之前一致，仅作微调 */
+        /* 样式与之前保持一致，仅增加大图模态框 */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -353,6 +353,7 @@
             max-width: 400px;
             width: 100%;
         }
+        .modal-content.large { max-width: 90vw; max-height: 90vh; }
         .modal-content input {
             width: 100%;
             padding: 12px 16px;
@@ -405,6 +406,8 @@
         }
         .tab-btn.active { background: #e0f2fe; color: #0369a1; }
         .auth-footer { text-align: center; margin-top: 20px; cursor: pointer; color: #0284c7; }
+        .photo-thumb { max-width: 100px; max-height: 80px; cursor: pointer; border-radius: 8px; transition: 0.2s; }
+        .photo-thumb:hover { opacity: 0.8; }
         @media (max-width: 640px) {
             .stats-panel { flex-direction: column; align-items: flex-start; }
             .toolbar { flex-direction: column; align-items: stretch; }
@@ -557,18 +560,26 @@
     </div>
 </div>
 
-<!-- 全局提示 -->
-<div id="toast" class="toast-message"></div>
-<div id="scanToast" class="scan-toast"></div>
-
 <!-- 详情模态框（用于查看单号详细记录） -->
 <div id="detailModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 600px;">
         <h3 id="detailTitle">单号详情</h3>
         <div id="detailList" style="max-height: 400px; overflow-y: auto;"></div>
         <div class="modal-buttons"><button id="detailModalClose" class="btn btn-primary">关闭</button></div>
     </div>
 </div>
+
+<!-- 大图查看模态框 -->
+<div id="imageModal" class="modal">
+    <div class="modal-content large" style="background: transparent; box-shadow: none;">
+        <img id="largeImage" style="max-width: 100%; max-height: 90vh; margin: auto; display: block; border-radius: 16px;">
+        <div style="text-align: center; margin-top: 16px;"><button id="closeImageBtn" class="btn btn-primary">关闭</button></div>
+    </div>
+</div>
+
+<!-- 全局提示 -->
+<div id="toast" class="toast-message"></div>
+<div id="scanToast" class="scan-toast"></div>
 
 <script>
     // ================== 配置 ==================
@@ -668,6 +679,9 @@
     const detailTitle = document.getElementById('detailTitle');
     const detailList = document.getElementById('detailList');
     const detailModalClose = document.getElementById('detailModalClose');
+    const imageModal = document.getElementById('imageModal');
+    const largeImage = document.getElementById('largeImage');
+    const closeImageBtn = document.getElementById('closeImageBtn');
     const prevPageBtn = document.getElementById('prevPageBtn');
     const nextPageBtn = document.getElementById('nextPageBtn');
     const pageInfo = document.getElementById('pageInfo');
@@ -817,7 +831,7 @@
     });
     searchModal.addEventListener('click', e => { if (e.target === searchModal) searchModal.classList.remove('show'); });
 
-    // ================== 详情模态框 ==================
+    // ================== 详情模态框（带图片放大）==================
     function showDetailModal(trackingNumber, records) {
         detailTitle.innerText = `单号详情 - ${trackingNumber}`;
         detailList.innerHTML = '';
@@ -825,15 +839,28 @@
         records.forEach(rec => {
             const div = document.createElement('div');
             div.className = 'modal-list-item';
+            let photoHtml = '';
+            if (rec.photo_url) {
+                photoHtml = `<img src="${rec.photo_url}" class="photo-thumb" data-url="${rec.photo_url}" style="max-width:100px; max-height:80px; margin-top:8px; cursor:pointer;">`;
+            }
             div.innerHTML = `
-                <div><div>${new Date(rec.scanned_at).toLocaleString()}</div><small>备注: ${rec.notes || '无'}</small>${rec.photo_url ? '<br><img src="'+rec.photo_url+'" style="max-width:100px; margin-top:8px;">' : ''}</div>
-                <div><button class="copy-btn" data-code="${escapeHtml(rec.tracking_number)}">📋</button><button class="delete-btn" data-localid="${rec.localId || ''}" data-cloudid="${rec.id || ''}">🗑️</button></div>
+                <div>
+                    <div>${new Date(rec.scanned_at).toLocaleString()}</div>
+                    <small>备注: ${rec.notes || '无'}</small>
+                    ${photoHtml}
+                </div>
+                <div>
+                    <button class="copy-btn" data-code="${escapeHtml(rec.tracking_number)}">📋</button>
+                    <button class="delete-btn" data-localid="${rec.localId || ''}" data-cloudid="${rec.id || ''}">🗑️</button>
+                </div>
             `;
             detailList.appendChild(div);
         });
+        // 绑定复制
         detailList.querySelectorAll('.copy-btn').forEach(btn => {
             btn.addEventListener('click', e => { navigator.clipboard.writeText(e.target.dataset.code).then(() => showToast('单号已复制')); });
         });
+        // 绑定删除
         detailList.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', async e => {
                 const localId = e.target.dataset.localid, cloudId = e.target.dataset.cloudid;
@@ -843,10 +870,21 @@
                 }
             });
         });
+        // 绑定图片点击放大
+        detailList.querySelectorAll('.photo-thumb').forEach(img => {
+            img.addEventListener('click', () => {
+                largeImage.src = img.dataset.url;
+                imageModal.classList.add('show');
+            });
+        });
         detailModal.classList.add('show');
     }
     detailModalClose.addEventListener('click', () => detailModal.classList.remove('show'));
     detailModal.addEventListener('click', e => { if (e.target === detailModal) detailModal.classList.remove('show'); });
+
+    // 关闭大图
+    closeImageBtn.addEventListener('click', () => imageModal.classList.remove('show'));
+    imageModal.addEventListener('click', e => { if (e.target === imageModal) imageModal.classList.remove('show'); });
 
     // ================== 本地存储 ==================
     const STORAGE_KEY = 'pending_scans';
@@ -1083,9 +1121,9 @@
         } catch (err) { return { allowed: true }; }
     }
 
-    // ================== 拍照上传 ==================
+    // ================== 拍照上传（按单号命名）==================
     function getVideoElement() { return document.querySelector('#interactive video'); }
-    async function captureAndUploadPhoto() {
+    async function captureAndUploadPhoto(trackingNumber) {
         if (!currentUser || isLocalMode) return null;
         const video = getVideoElement();
         if (!video || video.readyState < 2) { console.warn('摄像头未就绪'); return null; }
@@ -1095,7 +1133,17 @@
         canvas.getContext('2d').drawImage(video, 0, 0);
         const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8));
         if (!blob) return null;
-        const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.jpg`;
+
+        // 获取该单号已有的照片数量（包括云端和本地）
+        let existingPhotos = 0;
+        if (cloudDataLoaded) {
+            existingPhotos = cloudData.filter(r => r.tracking_number === trackingNumber && r.photo_url).length;
+        }
+        // 加上 pending 中已拍照但未同步的
+        existingPhotos += pendingRecords.filter(r => r.tracking_number === trackingNumber && r.photo_url).length;
+        const nextNum = existingPhotos + 1;
+        const fileName = `${trackingNumber}/${trackingNumber}-${nextNum}.jpg`;
+
         const { error } = await sbClient.storage.from('scan-photos').upload(fileName, blob, { contentType: 'image/jpeg', cacheControl: '3600' });
         if (error) { console.error('照片上传失败', error); return null; }
         const { data: { publicUrl } } = sbClient.storage.from('scan-photos').getPublicUrl(fileName);
@@ -1149,7 +1197,7 @@
         const isDuplicate = lastTime !== null;
         let photoUrl = null;
         if (!isLocalMode && isOnline && currentUser) {
-            photoUrl = await captureAndUploadPhoto();
+            photoUrl = await captureAndUploadPhoto(trackingNumber);
             photoHint.innerText = photoUrl ? '📸 已拍照' : '📸 拍照失败';
         } else {
             photoHint.innerText = '';
