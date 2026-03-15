@@ -456,12 +456,10 @@
 
 <script>
     // ================== 配置 ==================
-    // 请根据你的项目修改以下常量
     const SUPABASE_URL = 'https://vmkpymrujtvguvmzcisc.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu'; // 你提供的匿名密钥
-    const ADMIN_EMAIL = 'admin@example.com'; // 管理员邮箱（只有该邮箱登录后才可看到“用户管理”选项卡）
+    const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu'; // 请确认此密钥正确
+    const ADMIN_EMAIL = 'admin@example.com'; // 管理员邮箱
 
-    // 初始化 Supabase 客户端
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let currentUser = null;
@@ -470,7 +468,6 @@
     let currentPage = 1;
     const pageSize = 20;
 
-    // 用户管理相关
     let allUsers = [];
     let usersCurrentPage = 1;
     const usersPageSize = 20;
