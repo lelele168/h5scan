@@ -120,7 +120,7 @@
             border-collapse: collapse;
             margin-top: 20px;
             font-size: 0.95rem;
-            min-width: 1000px;
+            min-width: 800px;
             background: white;
             border-radius: 20px;
             overflow: hidden;
@@ -221,7 +221,6 @@
             font-size: 0.8rem;
             margin-left: 8px;
         }
-        /* 密码修改模态框 */
         .modal {
             display: none;
             position: fixed;
@@ -242,6 +241,8 @@
             padding: 28px;
             max-width: 400px;
             width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
         }
         .modal-content h3 { margin-bottom: 20px; }
         .modal-content input {
@@ -253,6 +254,7 @@
             margin-bottom: 16px;
         }
         .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
+        .settings-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; margin-left: 8px; }
         @media (max-width: 640px) {
             .filter-bar { flex-direction: column; align-items: stretch; }
             .filter-group { width: 100%; }
@@ -284,9 +286,13 @@
         <!-- 主管理区域（登录后显示） -->
         <div id="mainApp" style="display: none;">
             <div class="user-header">
-                <div id="userInfo"></div>
-                <span id="adminFlag" class="admin-badge" style="display: none;">管理员</span>
-                <button id="changePasswordBtn" class="btn btn-sm">修改密码</button>
+                <div>
+                    <span id="userInfo"></span>
+                    <span id="adminFlag" class="admin-badge" style="display: none;">管理员</span>
+                </div>
+                <div>
+                    <button id="settingsBtn" class="settings-btn" title="用户设置">⚙️</button>
+                </div>
             </div>
 
             <!-- 筛选工具栏 -->
@@ -336,7 +342,6 @@
                             <th>快递公司</th>
                             <th>扫描时间</th>
                             <th>备注</th>
-                            <th>用户 ID</th>
                         </tr>
                     </thead>
                     <tbody id="tableBody"></tbody>
@@ -353,16 +358,20 @@
     </div>
 </div>
 
-<!-- 修改密码模态框 -->
-<div id="passwordModal" class="modal">
+<!-- 用户设置模态框（修改邮箱/密码） -->
+<div id="settingsModal" class="modal">
     <div class="modal-content">
-        <h3>修改密码</h3>
+        <h3>账户设置</h3>
+        <label style="font-weight:600;">修改邮箱</label>
+        <input type="email" id="newEmail" placeholder="新邮箱">
+        <div style="margin: 20px 0; border-top:1px solid #e2e8f0;"></div>
+        <label style="font-weight:600;">修改密码</label>
         <input type="password" id="oldPassword" placeholder="当前密码">
         <input type="password" id="newPassword" placeholder="新密码（至少6位）">
         <input type="password" id="confirmPassword" placeholder="确认新密码">
         <div class="modal-buttons">
-            <button id="cancelPasswordBtn" class="btn">取消</button>
-            <button id="savePasswordBtn" class="btn btn-primary">保存</button>
+            <button id="cancelSettingsBtn" class="btn">取消</button>
+            <button id="saveSettingsBtn" class="btn btn-primary">保存</button>
         </div>
     </div>
 </div>
@@ -395,7 +404,14 @@
     const loginEmail = document.getElementById('loginEmail');
     const loginPassword = document.getElementById('loginPassword');
     const loginError = document.getElementById('loginError');
-    const changePasswordBtn = document.getElementById('changePasswordBtn');
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const newEmail = document.getElementById('newEmail');
+    const oldPassword = document.getElementById('oldPassword');
+    const newPassword = document.getElementById('newPassword');
+    const confirmPassword = document.getElementById('confirmPassword');
+    const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
+    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 
     const filterStart = document.getElementById('filterStart');
     const filterEnd = document.getElementById('filterEnd');
@@ -410,13 +426,6 @@
     const prevPageBtn = document.getElementById('prevPageBtn');
     const nextPageBtn = document.getElementById('nextPageBtn');
     const pageInfo = document.getElementById('pageInfo');
-
-    const passwordModal = document.getElementById('passwordModal');
-    const oldPassword = document.getElementById('oldPassword');
-    const newPassword = document.getElementById('newPassword');
-    const confirmPassword = document.getElementById('confirmPassword');
-    const cancelPasswordBtn = document.getElementById('cancelPasswordBtn');
-    const savePasswordBtn = document.getElementById('savePasswordBtn');
 
     const toast = document.getElementById('toast');
 
@@ -550,7 +559,7 @@
 
     function renderTable(records) {
         if (records.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px;">暂无数据</td></tr>';
+            tableBody.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:30px;">暂无数据</td></tr>';
             return;
         }
         tableBody.innerHTML = records.map(rec => `
@@ -559,7 +568,6 @@
                 <td>${escapeHtml(rec.carrier || '')}</td>
                 <td>${new Date(rec.scanned_at).toLocaleString()}</td>
                 <td>${escapeHtml(rec.notes || '')}</td>
-                <td>${escapeHtml(rec.user_id || '')}</td>
             </tr>
         `).join('');
     }
@@ -574,8 +582,7 @@
             '单号': r.tracking_number,
             '快递公司': r.carrier || '',
             '扫描时间': new Date(r.scanned_at).toLocaleString(),
-            '备注': r.notes || '',
-            '用户ID': r.user_id || ''
+            '备注': r.notes || ''
         }));
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
@@ -583,55 +590,84 @@
         XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
-    // ================== 修改密码 ==================
-    async function changePassword(oldPwd, newPwd) {
-        try {
-            const { error } = await sbClient.auth.updateUser({ password: newPwd });
-            if (error) throw error;
-            showToast('密码修改成功', 'success');
-            passwordModal.classList.remove('show');
-        } catch (err) {
-            showToast(err.message, 'error');
-        }
+    // ================== 用户设置（修改邮箱/密码） ==================
+    async function updateEmail(newEmail) {
+        const { error } = await sbClient.auth.updateUser({ email: newEmail });
+        if (error) throw error;
+        showToast('邮箱修改成功，请查收确认邮件', 'success');
     }
 
-    changePasswordBtn.addEventListener('click', () => {
-        oldPassword.value = '';
-        newPassword.value = '';
-        confirmPassword.value = '';
-        passwordModal.classList.add('show');
-    });
-
-    cancelPasswordBtn.addEventListener('click', () => {
-        passwordModal.classList.remove('show');
-    });
-
-    savePasswordBtn.addEventListener('click', async () => {
-        const oldPwd = oldPassword.value.trim();
-        const newPwd = newPassword.value.trim();
-        const confirmPwd = confirmPassword.value.trim();
-        if (!oldPwd || !newPwd || !confirmPwd) {
-            showToast('请填写所有字段', 'warning');
-            return;
-        }
-        if (newPwd.length < 6) {
-            showToast('新密码至少6位', 'warning');
-            return;
-        }
-        if (newPwd !== confirmPwd) {
-            showToast('两次新密码不一致', 'warning');
-            return;
-        }
-        // 验证旧密码：尝试重新登录
-        const { error } = await sbClient.auth.signInWithPassword({
+    async function updatePassword(oldPwd, newPwd) {
+        // 验证旧密码：重新登录
+        const { error: signInError } = await sbClient.auth.signInWithPassword({
             email: currentUser.email,
             password: oldPwd
         });
-        if (error) {
-            showToast('当前密码错误', 'error');
+        if (signInError) throw new Error('当前密码错误');
+        const { error } = await sbClient.auth.updateUser({ password: newPwd });
+        if (error) throw error;
+        showToast('密码修改成功', 'success');
+    }
+
+    settingsBtn.addEventListener('click', () => {
+        // 清空输入框
+        newEmail.value = '';
+        oldPassword.value = '';
+        newPassword.value = '';
+        confirmPassword.value = '';
+        settingsModal.classList.add('show');
+    });
+
+    cancelSettingsBtn.addEventListener('click', () => {
+        settingsModal.classList.remove('show');
+    });
+
+    saveSettingsBtn.addEventListener('click', async () => {
+        const email = newEmail.value.trim();
+        const oldPwd = oldPassword.value.trim();
+        const newPwd = newPassword.value.trim();
+        const confirmPwd = confirmPassword.value.trim();
+
+        // 如果邮箱和密码都为空，提示
+        if (!email && !oldPwd && !newPwd) {
+            showToast('请填写要修改的内容', 'warning');
             return;
         }
-        await changePassword(oldPwd, newPwd);
+
+        // 如果修改密码，需要验证
+        if (newPwd || oldPwd || confirmPwd) {
+            if (!oldPwd || !newPwd || !confirmPwd) {
+                showToast('修改密码需填写所有密码字段', 'warning');
+                return;
+            }
+            if (newPwd.length < 6) {
+                showToast('新密码至少6位', 'warning');
+                return;
+            }
+            if (newPwd !== confirmPwd) {
+                showToast('两次新密码不一致', 'warning');
+                return;
+            }
+        }
+
+        try {
+            // 先修改密码（如果提供了密码）
+            if (newPwd) {
+                await updatePassword(oldPwd, newPwd);
+            }
+            // 再修改邮箱（如果提供了邮箱）
+            if (email && email !== currentUser.email) {
+                await updateEmail(email);
+            } else if (email === currentUser.email) {
+                showToast('新邮箱与当前相同', 'warning');
+            }
+            if (!email && !newPwd) {
+                showToast('没有要修改的内容', 'warning');
+            }
+            settingsModal.classList.remove('show');
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
     });
 
     // ================== 用户认证 ==================
