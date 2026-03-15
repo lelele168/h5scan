@@ -317,10 +317,10 @@
                 </div>
             </div>
 
-            <!-- 选项卡：数据管理 / 用户管理 -->
+            <!-- 选项卡：数据管理 / 用户管理（仅管理员可见） -->
             <div class="tab-bar">
                 <button id="tabDataBtn" class="tab-btn active">📋 数据管理</button>
-                <button id="tabUsersBtn" class="tab-btn">👥 用户管理</button>
+                <button id="tabUsersBtn" class="tab-btn" style="display: none;">👥 用户管理</button>
             </div>
 
             <!-- 数据管理面板 -->
@@ -362,7 +362,7 @@
                     共 <span id="totalCount">0</span> 条记录
                 </div>
 
-                <!-- 数据表格容器（滚动） -->
+                <!-- 数据表格 -->
                 <div style="overflow-x: auto;">
                     <table id="dataTable">
                         <thead>
@@ -375,6 +375,13 @@
                         </thead>
                         <tbody id="tableBody"></tbody>
                     </table>
+                </div>
+
+                <!-- 数据分页 -->
+                <div class="pagination" id="pagination">
+                    <button id="prevPageBtn" disabled>◀ 上一页</button>
+                    <span id="pageInfo">第 1 页 / 共 1 页</span>
+                    <button id="nextPageBtn" disabled>下一页 ▶</button>
                 </div>
             </div>
 
@@ -408,13 +415,6 @@
                     <span id="usersPageInfo">第 1 页 / 共 1 页</span>
                     <button id="nextUsersPageBtn" disabled>下一页 ▶</button>
                 </div>
-            </div>
-
-            <!-- 分页控件（数据管理用） -->
-            <div class="pagination" id="pagination">
-                <button id="prevPageBtn" disabled>◀ 上一页</button>
-                <span id="pageInfo">第 1 页 / 共 1 页</span>
-                <button id="nextPageBtn" disabled>下一页 ▶</button>
             </div>
         </div>
     </div>
@@ -455,14 +455,14 @@
 <div id="toast" class="toast-message"></div>
 
 <script>
-    // ================== 配置 ==================
+    // ================== 配置（请根据你的项目修改）==================
     const SUPABASE_URL = 'https://vmkpymrujtvguvmzcisc.supabase.co';
+    // 匿名密钥（publishable key）- 已按你提供的值填写
     const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu';
-    // 服务角色密钥（用于用户管理，请务必替换为你的密钥，并妥善保管）
-    const SUPABASE_SERVICE_KEY = 'sb_secret_0VxfyiHrsWr-FemI7vz0Sw_o2BRAy3b'; // 请替换为实际密钥
-    // 管理员邮箱
+    // 管理员邮箱（只有该邮箱登录后才可看到“用户管理”选项卡）
     const ADMIN_EMAIL = 'admin@example.com';
 
+    // 初始化 Supabase 客户端（用于普通数据查询和认证）
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     let currentUser = null;
@@ -495,13 +495,11 @@
     const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 
-    // 选项卡
     const tabDataBtn = document.getElementById('tabDataBtn');
     const tabUsersBtn = document.getElementById('tabUsersBtn');
     const dataPanel = document.getElementById('dataPanel');
     const usersPanel = document.getElementById('usersPanel');
 
-    // 数据管理元素
     const filterStart = document.getElementById('filterStart');
     const filterEnd = document.getElementById('filterEnd');
     const filterNote = document.getElementById('filterNote');
@@ -516,7 +514,6 @@
     const nextPageBtn = document.getElementById('nextPageBtn');
     const pageInfo = document.getElementById('pageInfo');
 
-    // 用户管理元素
     const addUserBtn = document.getElementById('addUserBtn');
     const usersTableBody = document.getElementById('usersTableBody');
     const noUsersMsg = document.getElementById('noUsersMsg');
@@ -583,9 +580,9 @@
             const userIds = [...new Set(allRecords.map(r => r.user_id).filter(Boolean))];
             userIds.sort();
             filterUserId.innerHTML = '<option value="">全部</option>' + userIds.map(uid => `<option value="${escapeHtml(uid)}">${escapeHtml(uid)}</option>`).join('');
-            document.getElementById('userFilterGroup').style.display = 'block';
+            filterUserId.parentElement.style.display = 'block';
         } else {
-            document.getElementById('userFilterGroup').style.display = 'none';
+            filterUserId.parentElement.style.display = 'none';
         }
     }
 
@@ -664,26 +661,15 @@
         XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
-    // ================== 用户管理（使用 fetch 绕过库限制）==================
-    async function adminFetch(path, options = {}) {
-        const url = SUPABASE_URL + path;
-        const headers = {
-            'apikey': SUPABASE_SERVICE_KEY,
-            'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-            'Content-Type': 'application/json',
-        };
-        const res = await fetch(url, { ...options, headers });
-        if (!res.ok) {
-            const error = await res.json().catch(() => ({}));
-            throw new Error(error.msg || error.message || `请求失败 (${res.status})`);
-        }
-        return res.json();
-    }
-
+    // ================== 用户管理（通过 Edge Function）==================
     async function loadUsers() {
         if (!isAdmin(currentUser)) return;
         try {
-            const data = await adminFetch('/auth/v1/admin/users');
+            // 调用 Edge Function（函数名需与部署时一致，例如 clever-handler）
+            const { data, error } = await sbClient.functions.invoke('clever-handler', {
+                method: 'GET',
+            });
+            if (error) throw error;
             allUsers = data.users || [];
             renderUsersPage();
         } catch (err) {
@@ -740,9 +726,9 @@
                 const newPwd = prompt('请输入新密码（至少6位）');
                 if (newPwd && newPwd.length >= 6) {
                     try {
-                        await adminFetch(`/auth/v1/admin/users/${id}`, {
+                        await sbClient.functions.invoke(`clever-handler/${id}`, {
                             method: 'PUT',
-                            body: JSON.stringify({ password: newPwd })
+                            body: { password: newPwd }
                         });
                         showToast('密码已重置', 'success');
                     } catch (err) {
@@ -791,9 +777,9 @@
             if (isEdit) {
                 const updates = { email };
                 if (password) updates.password = password;
-                await adminFetch(`/auth/v1/admin/users/${id}`, {
+                await sbClient.functions.invoke(`clever-handler/${id}`, {
                     method: 'PUT',
-                    body: JSON.stringify(updates)
+                    body: updates
                 });
                 showToast('用户更新成功', 'success');
             } else {
@@ -801,9 +787,9 @@
                     showToast('密码至少6位', 'warning');
                     return;
                 }
-                await adminFetch('/auth/v1/admin/users', {
+                await sbClient.functions.invoke('clever-handler', {
                     method: 'POST',
-                    body: JSON.stringify({ email, password })
+                    body: { email, password }
                 });
                 showToast('用户创建成功', 'success');
             }
