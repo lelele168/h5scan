@@ -303,6 +303,7 @@
     function initAudio() {
         if (audioCtx) return;
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // 全局点击激活音频
         const enableAudio = () => {
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume().then(() => {
@@ -320,9 +321,28 @@
         document.addEventListener('touchstart', enableAudio);
     }
 
-    function playBeep(type) {
+    // 尝试恢复音频上下文（每次播放前调用）
+    async function ensureAudio() {
+        if (!audioCtx) return false;
+        if (audioCtx.state === 'suspended') {
+            try {
+                await audioCtx.resume();
+                audioEnabled = true;
+                audioTip.style.display = 'none';
+                return true;
+            } catch (e) {
+                console.warn('恢复音频失败', e);
+                return false;
+            }
+        }
+        return true;
+    }
+
+    async function playBeep(type) {
         if (!soundEnabled) return;                     // 用户关闭声音
-        if (!audioCtx || audioCtx.state !== 'running') return;
+        if (!audioCtx) return;
+        await ensureAudio();                            // 确保音频已激活
+        if (audioCtx.state !== 'running') return;
         const now = audioCtx.currentTime;
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -722,6 +742,9 @@
 
     // 处理扫描/输入的单号
     async function handleTrackingNumber(trackingNumber) {
+        // 尝试激活音频（如果用户已开启声音）
+        if (soundEnabled) await ensureAudio();
+
         const carrier = detectCarrier(trackingNumber);
         
         // 无效条码处理
@@ -760,9 +783,9 @@
         }
     }
 
-    // ================== 扫码初始化（修复暂停/开始逻辑）==================
+    // ================== 扫码初始化（修复暂停/开始）==================
     let quaggaInitialized = false;
-    let quaggaInitPending = false;   // 防止重复初始化
+    let quaggaInitPending = false;
 
     function initScanner(callback) {
         if (quaggaInitialized) {
@@ -770,7 +793,7 @@
             return;
         }
         if (quaggaInitPending) {
-            // 如果正在初始化，等待完成
+            // 等待初始化完成
             setTimeout(() => initScanner(callback), 200);
             return;
         }
@@ -807,8 +830,8 @@
         });
     }
 
-    function startScanner() {
-        if (!currentUser) return;
+    // 确保扫码正在运行（如果已停止则启动）
+    function ensureScannerRunning() {
         if (!quaggaInitialized) {
             initScanner((success) => {
                 if (success) {
@@ -818,9 +841,12 @@
                 }
             });
         } else {
-            Quagga.start();
-            isScanning = true;
-            updateScanButtons();
+            // 如果已初始化但未运行，则启动
+            if (!isScanning) {
+                Quagga.start();
+                isScanning = true;
+                updateScanButtons();
+            }
         }
     }
 
@@ -876,8 +902,8 @@
         loadPendingFromStorage();
         loadMergedHistory();
         updateSyncStatusUI();
-        initAudio();
-        updateScanButtons();  // 默认显示“开始扫码”
+        initAudio();               // 初始化音频上下文（但不激活）
+        updateScanButtons();        // 默认显示“开始扫码”
         // 不自动启动扫码
     }
 
@@ -956,7 +982,8 @@
         if (e.key === 'Enter') manualSubmit.click();
     });
 
-    startScanBtn.addEventListener('click', startScanner);
+    // 点击开始扫码时确保扫码运行
+    startScanBtn.addEventListener('click', ensureScannerRunning);
     pauseScanBtn.addEventListener('click', pauseScanner);
 
     searchInput.addEventListener('input', applyFilter);
