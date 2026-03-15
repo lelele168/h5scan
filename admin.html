@@ -457,16 +457,13 @@
 <script>
     // ================== 配置 ==================
     const SUPABASE_URL = 'https://vmkpymrujtvguvmzcisc.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu';
+    const SUPABASE_ANON_KEY = 'sb_publ1shable_RKS87INw-y0vLeZ9PU2SEw_U-3mK_';
     // 服务角色密钥（用于用户管理，请务必替换为你的密钥，并妥善保管）
     const SUPABASE_SERVICE_KEY = 'sb_secret_0VxfyiHrsWr-FemI7vz0Sw_o2BRAy3b'; // 请替换为实际密钥
+    // 管理员邮箱
+    const ADMIN_EMAIL = 'admin@example.com';
 
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    // 使用服务角色密钥的客户端（仅用于用户管理）
-    const sbAdmin = window.supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
-
-    // 管理员邮箱（可在此修改）
-    const ADMIN_EMAIL = 'admin@example.com';
 
     let currentUser = null;
     let allRecords = [];
@@ -667,170 +664,198 @@
         XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
-// ================== 用户管理（使用 fetch 绕过库限制）==================
-async function adminFetch(path, options = {}) {
-  const url = SUPABASE_URL + path;
-  const headers = {
-    'apikey': SUPABASE_SERVICE_KEY,
-    'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
-    'Content-Type': 'application/json',
-  };
-  const res = await fetch(url, { ...options, headers });
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({}));
-    throw new Error(error.msg || error.message || `请求失败 (${res.status})`);
-  }
-  return res.json();
-}
-
-async function loadUsers() {
-  if (!isAdmin(currentUser)) return;
-  try {
-    const data = await adminFetch('/auth/v1/admin/users');
-    allUsers = data.users || [];
-    renderUsersPage();
-  } catch (err) {
-    console.error('加载用户列表失败', err);
-    showToast('加载用户列表失败：' + err.message, 'error');
-  }
-}
-
-function renderUsersPage() {
-  const totalPages = Math.ceil(allUsers.length / usersPageSize) || 1;
-  if (usersCurrentPage < 1) usersCurrentPage = 1;
-  if (usersCurrentPage > totalPages) usersCurrentPage = totalPages;
-  const start = (usersCurrentPage - 1) * usersPageSize;
-  const end = start + usersPageSize;
-  const pageUsers = allUsers.slice(start, end);
-  renderUsersTable(pageUsers);
-  usersPageInfo.innerText = `第 ${usersCurrentPage} 页 / 共 ${totalPages} 页`;
-  prevUsersPageBtn.disabled = usersCurrentPage <= 1;
-  nextUsersPageBtn.disabled = usersCurrentPage >= totalPages;
-}
-
-function renderUsersTable(users) {
-  if (users.length === 0) {
-    usersTableBody.innerHTML = '';
-    noUsersMsg.style.display = 'block';
-    return;
-  }
-  noUsersMsg.style.display = 'none';
-  usersTableBody.innerHTML = users.map(u => `
-    <tr>
-      <td>${escapeHtml(u.email)}</td>
-      <td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td>
-      <td>${u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : '未登录'}</td>
-      <td>
-        <button class="btn btn-sm edit-user" data-id="${u.id}" data-email="${escapeHtml(u.email)}">✏️ 编辑</button>
-        <button class="btn btn-sm reset-pwd" data-id="${u.id}">🔑 重置密码</button>
-      </td>
-    </tr>
-  `).join('');
-
-  // 绑定编辑事件
-  document.querySelectorAll('.edit-user').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const id = btn.dataset.id;
-      const email = btn.dataset.email;
-      openEditUserModal(id, email);
-    });
-  });
-
-  // 绑定重置密码事件
-  document.querySelectorAll('.reset-pwd').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      const newPwd = prompt('请输入新密码（至少6位）');
-      if (newPwd && newPwd.length >= 6) {
-        try {
-          await adminFetch(`/auth/v1/admin/users/${id}`, {
-            method: 'PUT',
-            body: JSON.stringify({ password: newPwd })
-          });
-          showToast('密码已重置', 'success');
-        } catch (err) {
-          showToast(err.message, 'error');
+    // ================== 用户管理（使用 fetch 绕过库限制）==================
+    async function adminFetch(path, options = {}) {
+        const url = SUPABASE_URL + path;
+        const headers = {
+            'apikey': SUPABASE_SERVICE_KEY,
+            'Authorization': `Bearer ${SUPABASE_SERVICE_KEY}`,
+            'Content-Type': 'application/json',
+        };
+        const res = await fetch(url, { ...options, headers });
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.msg || error.message || `请求失败 (${res.status})`);
         }
-      } else if (newPwd) {
-        showToast('密码至少6位', 'warning');
-      }
-    });
-  });
-}
-
-// 新增用户
-addUserBtn.addEventListener('click', () => {
-  userModalTitle.innerText = '新增用户';
-  userEmail.value = '';
-  userPassword.value = '';
-  userModal.classList.add('show');
-});
-
-// 编辑用户
-function openEditUserModal(id, email) {
-  userModalTitle.innerText = '编辑用户';
-  userEmail.value = email;
-  userPassword.value = ''; // 密码留空，不修改
-  userModal.dataset.editId = id;
-  userModal.classList.add('show');
-}
-
-cancelUserBtn.addEventListener('click', () => {
-  userModal.classList.remove('show');
-});
-
-saveUserBtn.addEventListener('click', async () => {
-  const email = userEmail.value.trim();
-  const password = userPassword.value.trim();
-  const isEdit = userModalTitle.innerText.includes('编辑');
-  const id = userModal.dataset.editId;
-
-  if (!email) {
-    showToast('邮箱不能为空', 'warning');
-    return;
-  }
-
-  try {
-    if (isEdit) {
-      const updates = { email };
-      if (password) updates.password = password;
-      await adminFetch(`/auth/v1/admin/users/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify(updates)
-      });
-      showToast('用户更新成功', 'success');
-    } else {
-      if (!password || password.length < 6) {
-        showToast('密码至少6位', 'warning');
-        return;
-      }
-      await adminFetch('/auth/v1/admin/users', {
-        method: 'POST',
-        body: JSON.stringify({ email, password })
-      });
-      showToast('用户创建成功', 'success');
+        return res.json();
     }
-    userModal.classList.remove('show');
-    loadUsers();
-  } catch (err) {
-    showToast(err.message, 'error');
-  }
-});
 
-// 用户分页
-prevUsersPageBtn.addEventListener('click', () => {
-  if (usersCurrentPage > 1) {
-    usersCurrentPage--;
-    renderUsersPage();
-  }
-});
-nextUsersPageBtn.addEventListener('click', () => {
-  const totalPages = Math.ceil(allUsers.length / usersPageSize);
-  if (usersCurrentPage < totalPages) {
-    usersCurrentPage++;
-    renderUsersPage();
-  }
-});
+    async function loadUsers() {
+        if (!isAdmin(currentUser)) return;
+        try {
+            const data = await adminFetch('/auth/v1/admin/users');
+            allUsers = data.users || [];
+            renderUsersPage();
+        } catch (err) {
+            console.error('加载用户列表失败', err);
+            showToast('加载用户列表失败：' + err.message, 'error');
+        }
+    }
+
+    function renderUsersPage() {
+        const totalPages = Math.ceil(allUsers.length / usersPageSize) || 1;
+        if (usersCurrentPage < 1) usersCurrentPage = 1;
+        if (usersCurrentPage > totalPages) usersCurrentPage = totalPages;
+        const start = (usersCurrentPage - 1) * usersPageSize;
+        const end = start + usersPageSize;
+        const pageUsers = allUsers.slice(start, end);
+        renderUsersTable(pageUsers);
+        usersPageInfo.innerText = `第 ${usersCurrentPage} 页 / 共 ${totalPages} 页`;
+        prevUsersPageBtn.disabled = usersCurrentPage <= 1;
+        nextUsersPageBtn.disabled = usersCurrentPage >= totalPages;
+    }
+
+    function renderUsersTable(users) {
+        if (users.length === 0) {
+            usersTableBody.innerHTML = '';
+            noUsersMsg.style.display = 'block';
+            return;
+        }
+        noUsersMsg.style.display = 'none';
+        usersTableBody.innerHTML = users.map(u => `
+            <tr>
+                <td>${escapeHtml(u.email)}</td>
+                <td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td>
+                <td>${u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : '未登录'}</td>
+                <td>
+                    <button class="btn btn-sm edit-user" data-id="${u.id}" data-email="${escapeHtml(u.email)}">✏️ 编辑</button>
+                    <button class="btn btn-sm reset-pwd" data-id="${u.id}">🔑 重置密码</button>
+                </td>
+            </tr>
+        `).join('');
+
+        // 绑定编辑事件
+        document.querySelectorAll('.edit-user').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id;
+                const email = btn.dataset.email;
+                openEditUserModal(id, email);
+            });
+        });
+
+        // 绑定重置密码事件
+        document.querySelectorAll('.reset-pwd').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                const newPwd = prompt('请输入新密码（至少6位）');
+                if (newPwd && newPwd.length >= 6) {
+                    try {
+                        await adminFetch(`/auth/v1/admin/users/${id}`, {
+                            method: 'PUT',
+                            body: JSON.stringify({ password: newPwd })
+                        });
+                        showToast('密码已重置', 'success');
+                    } catch (err) {
+                        showToast(err.message, 'error');
+                    }
+                } else if (newPwd) {
+                    showToast('密码至少6位', 'warning');
+                }
+            });
+        });
+    }
+
+    // 新增用户
+    addUserBtn.addEventListener('click', () => {
+        userModalTitle.innerText = '新增用户';
+        userEmail.value = '';
+        userPassword.value = '';
+        userModal.classList.add('show');
+    });
+
+    // 编辑用户
+    function openEditUserModal(id, email) {
+        userModalTitle.innerText = '编辑用户';
+        userEmail.value = email;
+        userPassword.value = ''; // 密码留空，不修改
+        userModal.dataset.editId = id;
+        userModal.classList.add('show');
+    }
+
+    cancelUserBtn.addEventListener('click', () => {
+        userModal.classList.remove('show');
+    });
+
+    saveUserBtn.addEventListener('click', async () => {
+        const email = userEmail.value.trim();
+        const password = userPassword.value.trim();
+        const isEdit = userModalTitle.innerText.includes('编辑');
+        const id = userModal.dataset.editId;
+
+        if (!email) {
+            showToast('邮箱不能为空', 'warning');
+            return;
+        }
+
+        try {
+            if (isEdit) {
+                const updates = { email };
+                if (password) updates.password = password;
+                await adminFetch(`/auth/v1/admin/users/${id}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(updates)
+                });
+                showToast('用户更新成功', 'success');
+            } else {
+                if (!password || password.length < 6) {
+                    showToast('密码至少6位', 'warning');
+                    return;
+                }
+                await adminFetch('/auth/v1/admin/users', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, password })
+                });
+                showToast('用户创建成功', 'success');
+            }
+            userModal.classList.remove('show');
+            loadUsers();
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    });
+
+    // 用户分页
+    prevUsersPageBtn.addEventListener('click', () => {
+        if (usersCurrentPage > 1) {
+            usersCurrentPage--;
+            renderUsersPage();
+        }
+    });
+    nextUsersPageBtn.addEventListener('click', () => {
+        const totalPages = Math.ceil(allUsers.length / usersPageSize);
+        if (usersCurrentPage < totalPages) {
+            usersCurrentPage++;
+            renderUsersPage();
+        }
+    });
+
+    // ================== 选项卡切换 ==================
+    function switchTab(tab) {
+        if (tab === 'data') {
+            tabDataBtn.classList.add('active');
+            tabUsersBtn.classList.remove('active');
+            dataPanel.style.display = 'block';
+            usersPanel.style.display = 'none';
+        } else {
+            tabDataBtn.classList.remove('active');
+            tabUsersBtn.classList.add('active');
+            dataPanel.style.display = 'none';
+            usersPanel.style.display = 'block';
+            if (isAdmin(currentUser)) {
+                loadUsers();
+            }
+        }
+    }
+
+    tabDataBtn.addEventListener('click', () => switchTab('data'));
+    tabUsersBtn.addEventListener('click', () => {
+        if (!isAdmin(currentUser)) {
+            showToast('只有管理员可访问用户管理', 'warning');
+            return;
+        }
+        switchTab('users');
+    });
+
     // ================== 账户设置 ==================
     async function updateEmail(email) {
         const { error } = await sbClient.auth.updateUser({ email });
@@ -911,7 +936,6 @@ nextUsersPageBtn.addEventListener('click', () => {
         userInfoDiv.innerText = `👤 ${user.email}`;
         if (isAdmin(user)) {
             adminFlag.style.display = 'inline';
-            // 管理员可看到用户管理标签
             tabUsersBtn.style.display = 'inline-block';
         } else {
             adminFlag.style.display = 'none';
@@ -947,7 +971,7 @@ nextUsersPageBtn.addEventListener('click', () => {
             const { error } = await sbClient.auth.signInWithPassword({ email, password });
             if (error) throw error;
         } catch (err) {
-            loginError.innerText = err.message;
+            loginError.innerText = err.message; // 显示具体错误信息（如密码错误、用户不存在等）
         }
     });
 
@@ -955,7 +979,7 @@ nextUsersPageBtn.addEventListener('click', () => {
         await sbClient.auth.signOut();
     });
 
-    // ================== 事件绑定 ==================
+    // ================== 数据管理事件绑定 ==================
     applyFilterBtn.addEventListener('click', applyFilter);
     resetFilterBtn.addEventListener('click', resetFilter);
     exportBtn.addEventListener('click', exportToXLSX);
