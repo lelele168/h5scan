@@ -923,7 +923,7 @@
     }
     soundToggleBtn.addEventListener('click', toggleSound);
 
-    // ================== 语音朗读 ==================
+    // ================== 语音朗读（调整速度与音调）==================
     function speak(text) {
         if (!speechEnabled) {
             console.log('语音已关闭，不朗读:', text);
@@ -937,8 +937,8 @@
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'zh-CN';
-        utterance.rate = 0.9;
-        utterance.pitch = 1.2;
+        utterance.rate = 1.2;    // 语速稍快
+        utterance.pitch = 1.5;    // 音调更高，更尖锐
         utterance.volume = 1;
         const voices = window.speechSynthesis.getVoices();
         const femaleVoice = voices.find(voice => voice.lang.includes('zh') && voice.name.includes('Female'));
@@ -1122,7 +1122,7 @@
         if (e.target === searchModal) searchModal.classList.remove('show');
     });
 
-    // ================== 详情模态框 ==================
+    // ================== 详情模态框（修复删除刷新）==================
     function showDetailModal(trackingNumber, records) {
         detailTitle.innerText = `单号详情 - ${trackingNumber}`;
         detailList.innerHTML = '';
@@ -1155,8 +1155,13 @@
                 const localId = e.target.dataset.localid;
                 const cloudId = e.target.dataset.cloudid;
                 if (confirm('确定删除这条记录？')) {
-                    await deleteRecord(localId, cloudId);
-                    detailModal.classList.remove('show');
+                    const success = await deleteRecord(localId, cloudId);
+                    if (success) {
+                        // 关闭详情并刷新主表格
+                        detailModal.classList.remove('show');
+                        applyDataSource();
+                        updateSyncStatusUI();
+                    }
                 }
             });
         });
@@ -1445,6 +1450,7 @@
     }
 
     async function deleteRecord(localId, cloudId) {
+        let success = true;
         if (localId) {
             pendingRecords = pendingRecords.filter(r => r.localId !== localId);
             savePendingToStorage();
@@ -1457,10 +1463,10 @@
                 }
             } catch (err) {
                 showToast('删除失败', 'error');
-                return false;
+                success = false;
             }
         }
-        return true;
+        return success;
     }
 
     function findLastScanTime(trackingNumber) {
@@ -1659,7 +1665,7 @@
         return null;
     }
 
-    // ================== 扫码初始化 ==================
+    // ================== 扫码初始化（添加开始/暂停语音）==================
     let quaggaInitialized = false, quaggaInitPending = false;
 
     function initScanner(callback) {
@@ -1687,9 +1693,9 @@
 
     function startScanner() {
         if (!currentUser && !isLocalMode) return;
-        // 激活语音权限
+        // 语音提示
         if (speechEnabled) {
-            speak('扫码');
+            speak('扫码启动');
         }
         try { Quagga.stop(); } catch(e) {}
         quaggaInitialized = false; quaggaInitPending = false;
@@ -1707,6 +1713,10 @@
             Quagga.stop();
             isScanning = false;
             updateScanButtons();
+            // 语音提示
+            if (speechEnabled) {
+                speak('扫码暂停');
+            }
             showToast('扫码已暂停', 'warning');
         }
     }
