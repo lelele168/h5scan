@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>快递扫码系统 · 智能版</title>
+    <title>快递扫码系统 · 专业版</title>
     <!-- QuaggaJS 扫码库 -->
     <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <!-- Supabase JS 客户端 -->
@@ -83,7 +83,7 @@
 <div class="app">
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h1>📦 快递扫码 · 智能版</h1>
+            <h1>📦 快递扫码 · 智能识别版</h1>
             <div id="syncStatus" class="sync-status online" title="点击立即同步">🟢 在线</div>
         </div>
 
@@ -117,7 +117,6 @@
             <div class="scanner-container">
                 <div id="interactive" class="viewport"></div>
             </div>
-            <!-- 扫码控制：默认显示“开始扫码” -->
             <div class="scanner-controls">
                 <button id="startScanBtn" class="btn btn-success">▶️ 开始扫码</button>
                 <button id="pauseScanBtn" class="btn btn-warning" style="display: none;">⏸️ 暂停扫码</button>
@@ -129,7 +128,6 @@
                 <button id="manualSubmit" class="btn btn-primary">登记</button>
             </div>
 
-            <!-- 最新扫描结果卡片（初始隐藏） -->
             <div id="currentResult" class="result-card" style="display: none;">
                 <h3>📌 最新扫描</h3>
                 <p><strong>单号：</strong> <span id="trackingNumber"></span></p>
@@ -182,7 +180,7 @@
             <div class="audio-tip" id="audioTip">🔊 点击页面任意位置以启用声音提示</div>
         </div>
     </div>
-    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 智能识别</div>
+    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 基于实际数据优化识别</div>
 </div>
 
 <!-- 全局 Toast 提示 -->
@@ -194,25 +192,30 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu';
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // 快递公司识别规则（按优先级排列，无兜底规则）
+    // ================== 快递公司识别规则（基于实际数据优化）==================
     const carrierRules = [
-        { name: '顺丰速运', regex: /^SF\d{12}$/i },
-        { name: '圆通速递', regex: /^YT\d{10,12}$/i },
-        { name: '中通快递', regex: /^\d{12}$/ },
-        { name: '申通快递', regex: /^ST\d{10,12}$/i },
-        { name: '韵达快递', regex: /^YD\d{10,12}$/i },
-        { name: '京东物流', regex: /^JD\d{10,12}$/i },
-        { name: '邮政EMS', regex: /^\d{13}$/ },
-        { name: '极兔速递', regex: /^JT\d{10,12}$/i },
-        { name: '百世快递', regex: /^BS\d{10,12}$/i },
-        { name: '天天快递', regex: /^TT\d{10,12}$/i },
-        { name: '德邦快递', regex: /^DP\d{10,12}$/i }
+        // 顺丰：SF + 13位数字（总长15位）
+        { name: '顺丰快递', regex: /^SF\d{13}$/i },
+        // 圆通：YT + 13位数字（总长15位）
+        { name: '圆通快递', regex: /^YT\d{13}$/i },
+        // 中通：14位纯数字（样本73598902303422为14位）
+        { name: '中通快递', regex: /^\d{14}$/ },
+        // 申通：以777或772开头，后接12位数字（总长15位）
+        { name: '申通快递', regex: /^(777|772)\d{12}$/ },
+        // 韵达：以46、43、31、32开头，后接11-13位数字（总长13-15位）
+        { name: '韵达快递', regex: /^(46|43|31|32)\d{11,13}$/ },
+        // 极兔：JT + 13位数字，或JT315等变体（总长15位，JT后跟13位）
+        { name: '极兔快递', regex: /^JT\d{13}$/i },
+        // EMS：以13开头，后接11位数字（总长13位）
+        { name: 'EMS', regex: /^13\d{11}$/ },
+        // 邮政快递：以98或82开头，后接11位数字（总长13位）
+        { name: '邮政快递', regex: /^(98|82)\d{11}$/ }
     ];
 
     let currentUser = null;
     let pendingRecords = [];
     let isOnline = navigator.onLine;
-    let isScanning = false;          // 扫码是否运行
+    let isScanning = false;
     let lastScannedCode = '';
     let lastScanTime = 0;
     let allRecords = [];
@@ -686,7 +689,6 @@
             playBeep('error');
             vibrate('error');
             showToast('❌ 无效的快递单号', 'error');
-            // 隐藏之前的结果卡片（可选）
             currentResult.style.display = 'none';
             return;
         }
@@ -718,7 +720,7 @@
         }
     }
 
-    // ================== 扫码初始化（增强一维码识别）==================
+    // ================== 扫码初始化 ==================
     let quaggaInitialized = false;
 
     function initScanner() {
@@ -728,11 +730,7 @@
                 name: "Live",
                 type: "LiveStream",
                 target: document.querySelector('#interactive'),
-                constraints: {
-                    width: 640,
-                    height: 480,
-                    facingMode: "environment"
-                },
+                constraints: { width: 640, height: 480, facingMode: "environment" }
             },
             decoder: {
                 readers: [
@@ -740,30 +738,11 @@
                     "ean_reader",
                     "ean_8_reader",
                     "code_39_reader",
-                    "code_39_vin_reader",
                     "codabar_reader",
                     "upc_reader",
-                    "upc_e_reader",
                     "i2of5_reader"
-                ],
-                debug: {
-                    showCanvas: false,
-                    showPatches: false,
-                    showFoundPatches: false,
-                    showSkeleton: false,
-                    showLabels: false,
-                    showPatchLabels: false,
-                    showRemainingPatchLabels: false,
-                    boxFromPatches: {
-                        showTransformed: false,
-                        showTransformedBox: false,
-                        showBB: false
-                    }
-                }
-            },
-            locate: true,
-            numOfWorkers: 4,
-            frequency: 10
+                ]
+            }
         }, function(err) {
             if (err) {
                 console.error('扫码器初始化失败:', err);
@@ -771,14 +750,13 @@
                 return;
             }
             quaggaInitialized = true;
-            console.log('Quagga 初始化成功，等待扫码...');
+            console.log('扫码器就绪');
         });
     }
 
     function startScanner() {
         if (!quaggaInitialized) {
             initScanner();
-            // 等待初始化完成再启动
             setTimeout(() => {
                 if (quaggaInitialized) {
                     Quagga.start();
@@ -813,7 +791,6 @@
         }
     }
 
-    // 绑定扫码检测事件
     Quagga.onDetected(function(result) {
         if (!isScanning || !currentUser) return;
         const code = result.codeResult.code;
@@ -845,11 +822,10 @@
         userInfoDiv.innerText = `👤 ${user.email}`;
         sessionStartTime = new Date();
         loadPendingFromStorage();
-        initScanner();          // 初始化扫码，但不启动
+        initScanner();
         loadMergedHistory();
         updateSyncStatusUI();
-        initAudio();            // 初始化音频（需用户点击激活）
-        // 默认显示开始扫码按钮，暂停按钮隐藏
+        initAudio();
         updateScanButtons();
     }
 
@@ -1020,7 +996,7 @@
 
     // 初始化加载本地存储
     loadPendingFromStorage();
-    initAudio(); // 初始化音频上下文，但不激活
+    initAudio();
 </script>
 </body>
 </html>
