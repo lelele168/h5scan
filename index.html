@@ -154,6 +154,7 @@
             color: #0284c7;
             text-decoration: none;
             font-weight: 600;
+            cursor: pointer;
         }
         .local-mode-btn {
             margin-top: 20px;
@@ -782,14 +783,14 @@
     let lastScanTime = 0;
 
     // 模式：normal（登录用户）或 local（本地模式）
-    let appMode = 'normal'; // 'normal' 或 'local'
-    let isLocalMode = false; // 辅助标志
+    let appMode = 'normal';
+    let isLocalMode = false;
 
     // 所有原始记录（用于分组）
-    let allRecords = [];          // 本地待同步 + 云端已同步（合并后）
-    let cloudData = [];           // 纯云端数据
-    let sessionStartTime = null;  // 本次登录时间（仅用于正常模式）
-    let cloudDataLoaded = false;  // 云端数据是否已加载
+    let allRecords = [];
+    let cloudData = [];
+    let sessionStartTime = null;
+    let cloudDataLoaded = false;
 
     // 语音相关
     let speechEnabled = true;
@@ -805,7 +806,7 @@
     // 分页相关
     let currentPage = 1;
     const pageSize = 10;
-    let groupedRecords = [];       // 分组后的记录（用于显示）
+    let groupedRecords = [];
 
     // 数据源模式：'local', 'cloud', 'all'（在本地模式下，cloud 无效）
     let dataSourceMode = 'local';
@@ -1031,6 +1032,10 @@
 
     // ================== 手动输入模态框 ==================
     manualBtn.addEventListener('click', () => {
+        // 激活语音权限
+        if (speechEnabled) {
+            speak('输入');
+        }
         manualModalInput.value = '';
         manualModal.classList.add('show');
         manualModalInput.focus();
@@ -1321,8 +1326,6 @@
 
         if (dataSourceMode === 'local') {
             if (isLocalMode) {
-                // 本地模式没有登录，所有记录都是本地
-                // 但我们可以按时间过滤？本地模式不区分 session
                 baseRecords = pendingRecords;
             } else {
                 // 正常模式：本地数据指本次登录后的记录
@@ -1335,7 +1338,6 @@
                 baseRecords = [...cloudData];
             }
         } else { // all
-            // 全部数据 = 合并后的所有
             if (isLocalMode) {
                 baseRecords = pendingRecords;
             } else {
@@ -1491,7 +1493,6 @@
             rangeDesc = '全部';
         }
 
-        // 基于当前数据源？
         let toDeleteRecords = startTime ? allRecords.filter(r => new Date(r.scanned_at) >= startTime) : allRecords;
         if (toDeleteRecords.length === 0) { showToast('所选范围内没有记录', 'warning'); return; }
         if (!confirm(`确定删除 ${rangeDesc} 的 ${toDeleteRecords.length} 条记录吗？`)) return;
@@ -1552,18 +1553,15 @@
 
     // ================== 限制检查 ==================
     async function checkLimits(trackingNumber) {
-        // 本地检查
         const localCount = pendingRecords.filter(r => r.tracking_number === trackingNumber).length;
         if (localCount >= 3) {
             return { allowed: false, reason: '本设备上该单号已扫描3次' };
         }
 
         if (isLocalMode || !isOnline || !currentUser) {
-            // 本地模式或离线时只检查本地
             return { allowed: true };
         }
 
-        // 在线，检查云端
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -1689,6 +1687,10 @@
 
     function startScanner() {
         if (!currentUser && !isLocalMode) return;
+        // 激活语音权限
+        if (speechEnabled) {
+            speak('扫码');
+        }
         try { Quagga.stop(); } catch(e) {}
         quaggaInitialized = false; quaggaInitPending = false;
         initScanner(success => {
@@ -1739,7 +1741,6 @@
         userHeader.style.display = 'flex';
         updateSyncStatusUI();
 
-        // 根据模式禁用/启用云端相关按钮
         if (isLocalMode) {
             dataSourceCloud.disabled = true;
             syncStatusDiv.style.display = 'none';
@@ -1756,17 +1757,14 @@
         noteLocked = false; lockedNote = ''; noteInput.value = ''; updateLockUI();
 
         if (isLocalMode) {
-            // 本地模式，不加载云端
             cloudDataLoaded = false;
             cloudData = [];
             applyDataSource();
         } else {
-            // 正常模式，可能需要加载云端
-            setDataSource('local'); // 默认本地数据（本次登录）
+            setDataSource('local');
         }
     }
 
-    // 登录成功
     async function handleLoginSuccess(user) {
         currentUser = user;
         isLocalMode = false;
@@ -1774,11 +1772,9 @@
         sessionStartTime = new Date();
         userInfoDiv.innerText = `👤 ${user.email}`;
         showApp();
-        // 预加载云端数据（但不自动切换）
         loadCloudData();
     }
 
-    // 本地模式
     function enterLocalMode() {
         currentUser = null;
         isLocalMode = true;
@@ -1788,19 +1784,16 @@
         showApp();
     }
 
-    // 退出登录
     logoutBtn.addEventListener('click', async () => {
         if (!isLocalMode) {
             pauseScanner();
             await sbClient.auth.signOut();
         }
-        // 本地模式直接退出到登录页
         currentUser = null;
         isLocalMode = false;
         showAuth();
     });
 
-    // 监听认证状态（正常模式）
     sbClient.auth.onAuthStateChange((event, session) => {
         if (session && !isLocalMode) {
             currentUser = session.user;
@@ -1899,7 +1892,7 @@
     });
 
     exportCsvBtn.addEventListener('click', async () => {
-        let records = allRecords; // 当前显示的所有原始记录
+        let records = allRecords;
         if (records.length === 0) { showToast('暂无数据', 'warning'); return; }
         const headers = ['单号','快递公司','扫描时间','备注','状态'];
         const rows = records.map(r => [r.tracking_number, r.carrier||'', new Date(r.scanned_at).toLocaleString(), r.notes||'', r.pending?'待同步':'已同步']);
