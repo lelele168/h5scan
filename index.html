@@ -206,15 +206,24 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu';
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // 快递公司识别规则（基于实际数据优化）
+    // ================== 快递公司识别规则 ==================
+    // 根据实际数据精确匹配
     const carrierRules = [
+        // 顺丰：SF + 13位数字（总长15位）
         { name: '顺丰快递', regex: /^SF\d{13}$/i },
+        // 圆通：YT + 13位数字（总长15位）
         { name: '圆通快递', regex: /^YT\d{13}$/i },
-        { name: '中通快递', regex: /^\d{14}$/ },
+        // 中通：仅匹配以73、75、78开头的14位纯数字（根据你提供的最新数据）
+        { name: '中通快递', regex: /^(73|75|78)\d{11}$/ },
+        // 申通：以777或772开头，后接12位数字（总长15位）
         { name: '申通快递', regex: /^(777|772)\d{12}$/ },
+        // 韵达：以46、43、31、32开头，后接11-13位数字（总长13-15位）
         { name: '韵达快递', regex: /^(46|43|31|32)\d{11,13}$/ },
+        // 极兔：JT + 13位数字（总长15位）
         { name: '极兔快递', regex: /^JT\d{13}$/i },
+        // EMS：以13开头，后接11位数字（总长13位）
         { name: 'EMS', regex: /^13\d{11}$/ },
+        // 邮政快递：以98或82开头，后接11位数字（总长13位）
         { name: '邮政快递', regex: /^(98|82)\d{11}$/ }
     ];
 
@@ -299,7 +308,10 @@
 
     // ================== 语音朗读 ==================
     function speak(text) {
-        if (!speechEnabled) return;
+        if (!speechEnabled) {
+            console.log('语音已关闭，不朗读');
+            return;
+        }
         if (!window.speechSynthesis) {
             console.warn('浏览器不支持语音合成');
             return;
@@ -317,6 +329,7 @@
         if (femaleVoice) {
             utterance.voice = femaleVoice;
         }
+        console.log('朗读:', text);
         window.speechSynthesis.speak(utterance);
     }
 
@@ -1049,6 +1062,11 @@
     // 初始化
     loadPendingFromStorage();
     loadSoundPreference();
+
+    // 预加载语音列表（某些浏览器需要）
+    if (window.speechSynthesis) {
+        window.speechSynthesis.getVoices();
+    }
 </script>
 </body>
 </html>
