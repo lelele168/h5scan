@@ -120,7 +120,7 @@
             <!-- 扫码控制：默认显示“开始扫码” -->
             <div class="scanner-controls">
                 <button id="startScanBtn" class="btn btn-success">▶️ 开始扫码</button>
-                <button id="stopScanBtn" class="btn btn-warning" style="display: none;">⏹️ 停止扫码</button>
+                <button id="pauseScanBtn" class="btn btn-warning" style="display: none;">⏸️ 暂停扫码</button>
             </div>
             <p class="hint">将快递单条码对准摄像头，或手动输入单号</p>
 
@@ -248,7 +248,7 @@
     const exportCsvBtn = document.getElementById('exportCsvBtn');
     const exportXlsxBtn = document.getElementById('exportXlsxBtn');
     const startScanBtn = document.getElementById('startScanBtn');
-    const stopScanBtn = document.getElementById('stopScanBtn');
+    const pauseScanBtn = document.getElementById('pauseScanBtn');
     const searchInput = document.getElementById('searchInput');
     const clearRangeSelect = document.getElementById('clearRangeSelect');
     const clearRangeBtn = document.getElementById('clearRangeBtn');
@@ -718,7 +718,7 @@
         }
     }
 
-    // ================== 扫码初始化 ==================
+    // ================== 扫码初始化（增强一维码识别）==================
     let quaggaInitialized = false;
 
     function initScanner() {
@@ -728,31 +728,66 @@
                 name: "Live",
                 type: "LiveStream",
                 target: document.querySelector('#interactive'),
-                constraints: { width: 640, height: 480, facingMode: "environment" }
+                constraints: {
+                    width: 640,
+                    height: 480,
+                    facingMode: "environment"
+                },
             },
-            decoder: { readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader", "codabar_reader", "upc_reader", "i2of5_reader"] }
+            decoder: {
+                readers: [
+                    "code_128_reader",
+                    "ean_reader",
+                    "ean_8_reader",
+                    "code_39_reader",
+                    "code_39_vin_reader",
+                    "codabar_reader",
+                    "upc_reader",
+                    "upc_e_reader",
+                    "i2of5_reader"
+                ],
+                debug: {
+                    showCanvas: false,
+                    showPatches: false,
+                    showFoundPatches: false,
+                    showSkeleton: false,
+                    showLabels: false,
+                    showPatchLabels: false,
+                    showRemainingPatchLabels: false,
+                    boxFromPatches: {
+                        showTransformed: false,
+                        showTransformedBox: false,
+                        showBB: false
+                    }
+                }
+            },
+            locate: true,
+            numOfWorkers: 4,
+            frequency: 10
         }, function(err) {
             if (err) {
                 console.error('扫码器初始化失败:', err);
                 showToast('无法启动摄像头，请检查权限', 'error');
                 return;
             }
-            // 初始化成功，但不自动启动
             quaggaInitialized = true;
+            console.log('Quagga 初始化成功，等待扫码...');
         });
     }
 
     function startScanner() {
         if (!quaggaInitialized) {
             initScanner();
-            // 等待初始化完成再启动，简单起见延时启动
+            // 等待初始化完成再启动
             setTimeout(() => {
                 if (quaggaInitialized) {
                     Quagga.start();
                     isScanning = true;
                     updateScanButtons();
+                } else {
+                    showToast('扫码初始化失败，请刷新重试', 'error');
                 }
-            }, 500);
+            }, 800);
         } else {
             Quagga.start();
             isScanning = true;
@@ -760,7 +795,7 @@
         }
     }
 
-    function stopScanner() {
+    function pauseScanner() {
         if (quaggaInitialized && isScanning) {
             Quagga.stop();
             isScanning = false;
@@ -771,12 +806,26 @@
     function updateScanButtons() {
         if (isScanning) {
             startScanBtn.style.display = 'none';
-            stopScanBtn.style.display = 'inline-block';
+            pauseScanBtn.style.display = 'inline-block';
         } else {
             startScanBtn.style.display = 'inline-block';
-            stopScanBtn.style.display = 'none';
+            pauseScanBtn.style.display = 'none';
         }
     }
+
+    // 绑定扫码检测事件
+    Quagga.onDetected(function(result) {
+        if (!isScanning || !currentUser) return;
+        const code = result.codeResult.code;
+        if (!code) return;
+        const now = Date.now();
+        if (code === lastScannedCode && (now - lastScanTime) < 2000) {
+            return;
+        }
+        lastScannedCode = code;
+        lastScanTime = now;
+        handleTrackingNumber(code);
+    });
 
     // ================== 用户认证 ==================
     function showAuth() {
@@ -800,7 +849,7 @@
         loadMergedHistory();
         updateSyncStatusUI();
         initAudio();            // 初始化音频（需用户点击激活）
-        // 默认显示停止扫码按钮隐藏，开始扫码显示
+        // 默认显示开始扫码按钮，暂停按钮隐藏
         updateScanButtons();
     }
 
@@ -862,7 +911,7 @@
     });
 
     logoutBtn.addEventListener('click', async () => {
-        stopScanner();
+        pauseScanner();
         await sbClient.auth.signOut();
     });
 
@@ -880,7 +929,7 @@
     });
 
     startScanBtn.addEventListener('click', startScanner);
-    stopScanBtn.addEventListener('click', stopScanner);
+    pauseScanBtn.addEventListener('click', pauseScanner);
 
     searchInput.addEventListener('input', applyFilter);
 
