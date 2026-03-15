@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>快递扫码系统 · 专业版</title>
+    <title>快递扫码系统 · 智能版</title>
     <!-- QuaggaJS 扫码库 -->
     <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <!-- Supabase JS 客户端 -->
@@ -70,13 +70,14 @@
         .footer-note { text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 30px; }
         .error-msg { color: #dc2626; font-size: 0.9rem; margin-top: 8px; }
         .badge { background: #ef4444; color: white; border-radius: 20px; padding: 2px 8px; font-size: 0.7rem; margin-left: 6px; }
+        .audio-tip { text-align: center; color: #0284c7; font-size: 0.8rem; margin-top: 8px; cursor: pointer; }
     </style>
 </head>
 <body>
 <div class="app">
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h1>📦 快递扫码 · 专业版</h1>
+            <h1>📦 快递扫码 · 智能版</h1>
             <div id="syncStatus" class="sync-status online" title="点击立即同步">🟢 在线</div>
         </div>
 
@@ -121,11 +122,13 @@
                 <button id="manualSubmit" class="btn btn-primary">登记</button>
             </div>
 
+            <!-- 最新扫描结果（增加重复提示行） -->
             <div id="currentResult" class="result-card" style="display: none;">
                 <h3>✅ 最新扫描</h3>
                 <p><strong>单号：</strong> <span id="trackingNumber"></span></p>
                 <p><strong>快递公司：</strong> <span id="carrier"></span></p>
                 <p><strong>时间：</strong> <span id="scannedAt"></span></p>
+                <p id="duplicateHint" style="color: #f59e0b; margin-top: 8px; font-size: 0.9rem;"></p>
             </div>
 
             <!-- 统计面板 -->
@@ -169,9 +172,10 @@
                 </table>
             </div>
             <p id="noDataMsg" style="color:#94a3b8; text-align:center; padding:30px;">暂无记录</p>
+            <div class="audio-tip" id="audioTip">🔊 点击页面任意位置以启用声音提示</div>
         </div>
     </div>
-    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 连续扫码</div>
+    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 连续扫码 · 智能识别</div>
 </div>
 
 <script>
@@ -199,7 +203,11 @@
     let lastScannedCode = '';
     let lastScanTime = 0;
     let allRecords = [];
-    let sessionStartTime = null; // 记录本次登录时间
+    let sessionStartTime = null;
+
+    // 音频相关
+    let audioCtx = null;
+    let audioEnabled = false;
 
     // DOM 元素
     const syncStatusDiv = document.getElementById('syncStatus');
@@ -221,6 +229,7 @@
     const trackingSpan = document.getElementById('trackingNumber');
     const carrierSpan = document.getElementById('carrier');
     const scannedAtSpan = document.getElementById('scannedAt');
+    const duplicateHint = document.getElementById('duplicateHint');
     const historyBody = document.getElementById('historyBody');
     const noDataMsg = document.getElementById('noDataMsg');
     const exportCsvBtn = document.getElementById('exportCsvBtn');
@@ -233,6 +242,60 @@
     const totalCountSpan = document.getElementById('totalCount');
     const uniqueCountSpan = document.getElementById('uniqueCount');
     const carrierStatsDiv = document.getElementById('carrierStats');
+    const audioTip = document.getElementById('audioTip');
+
+    // ================== 音频与震动 ==================
+    function initAudio() {
+        if (audioCtx) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // 页面任意点击激活音频
+        const enableAudio = () => {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    audioEnabled = true;
+                    audioTip.style.display = 'none';
+                }).catch(e => console.warn('音频激活失败', e));
+            } else {
+                audioEnabled = true;
+                audioTip.style.display = 'none';
+            }
+            document.removeEventListener('click', enableAudio);
+            document.removeEventListener('touchstart', enableAudio);
+        };
+        document.addEventListener('click', enableAudio);
+        document.addEventListener('touchstart', enableAudio);
+    }
+
+    function playBeep(type) {
+        if (!audioCtx || audioCtx.state !== 'running') return;
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        if (type === 'success') {
+            osc.frequency.value = 880; // A5
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+            osc.start(now);
+            osc.stop(now + 0.1);
+        } else {
+            osc.frequency.value = 440; // A4
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+            osc.start(now);
+            osc.stop(now + 0.2);
+        }
+    }
+
+    function vibrate(type) {
+        if (!navigator.vibrate) return;
+        if (type === 'success') {
+            navigator.vibrate(50);
+        } else {
+            navigator.vibrate([100, 50, 100]);
+        }
+    }
 
     // ================== 本地存储 ==================
     const STORAGE_KEY = 'pending_scans';
@@ -412,7 +475,6 @@
             </tr>
         `}).join('');
 
-        // 绑定复制事件
         document.querySelectorAll('.copy-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const code = e.target.dataset.code;
@@ -424,7 +486,6 @@
             });
         });
 
-        // 绑定删除事件
         document.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const localId = e.target.dataset.localid;
@@ -463,6 +524,15 @@
         updateSyncStatusUI();
     }
 
+    // 查找单号最近一次扫描时间
+    function findLastScanTime(trackingNumber) {
+        const records = allRecords.filter(r => r.tracking_number === trackingNumber);
+        if (records.length === 0) return null;
+        // 按时间倒序，取第一个（最新）
+        records.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+        return new Date(records[0].scanned_at);
+    }
+
     // ================== 按范围删除 ==================
     async function clearRecordsByRange() {
         const range = clearRangeSelect.value;
@@ -483,11 +553,10 @@
             startTime = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
             rangeDesc = '最近一周';
         } else if (range === 'all') {
-            startTime = null; // 表示全部
+            startTime = null;
             rangeDesc = '全部';
         }
 
-        // 计算要删除的记录数量（用于确认）
         let toDelete = [];
         if (startTime) {
             toDelete = allRecords.filter(r => new Date(r.scanned_at) >= startTime);
@@ -504,7 +573,6 @@
             return;
         }
 
-        // 删除云端记录
         if (isOnline && currentUser) {
             try {
                 let query = sbClient
@@ -512,7 +580,6 @@
                     .delete()
                     .eq('user_id', currentUser.id);
                 if (startTime) {
-                    // 注意：scanned_at 是带时区的，使用 ISO 字符串比较
                     query = query.gte('scanned_at', startTime.toISOString());
                 }
                 const { error } = await query;
@@ -524,15 +591,13 @@
             }
         }
 
-        // 删除本地待同步记录
         if (startTime) {
             pendingRecords = pendingRecords.filter(r => new Date(r.scanned_at) < startTime);
         } else {
-            pendingRecords = []; // 全部
+            pendingRecords = [];
         }
         savePendingToStorage();
 
-        // 重新加载数据
         await loadMergedHistory();
         updateSyncStatusUI();
     }
@@ -590,13 +655,40 @@
         }
     }
 
+    // 处理扫描/输入的单号（新增智能识别与重复提示）
     async function handleTrackingNumber(trackingNumber) {
         const carrier = detectCarrier(trackingNumber);
+        
+        // 无效条码处理
+        if (carrier === '未知') {
+            playBeep('error');
+            vibrate('error');
+            alert('❌ 无效的快递单号，请重新扫描');
+            return;
+        }
+
+        // 查找上次扫描时间
+        const lastTime = findLastScanTime(trackingNumber);
+        
+        // 保存记录
+        await saveScan(trackingNumber, carrier);
+        
+        // 播放成功音
+        playBeep('success');
+        vibrate('success');
+
+        // 显示最新结果
         currentResult.style.display = 'block';
         trackingSpan.innerText = trackingNumber;
         carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
         scannedAtSpan.innerText = new Date().toLocaleString();
-        await saveScan(trackingNumber, carrier);
+
+        // 显示重复提示
+        if (lastTime) {
+            duplicateHint.innerText = `⏰ 上次扫描：${lastTime.toLocaleString()}`;
+        } else {
+            duplicateHint.innerText = '';
+        }
     }
 
     // ================== 扫码初始化 ==================
@@ -681,11 +773,12 @@
         mainApp.style.display = 'block';
         logoutBtn.style.display = 'inline-block';
         userInfoDiv.innerText = `👤 ${user.email}`;
-        sessionStartTime = new Date(); // 记录登录时间
+        sessionStartTime = new Date();
         loadPendingFromStorage();
         initScanner();
         loadMergedHistory();
         updateSyncStatusUI();
+        initAudio(); // 初始化音频（但需用户点击才能播放）
     }
 
     sbClient.auth.onAuthStateChange((event, session) => {
@@ -777,7 +870,6 @@
         }
     });
 
-    // 导出功能（略，与之前相同）
     exportCsvBtn.addEventListener('click', async () => {
         if (!currentUser) return;
         let cloudData = [];
@@ -853,6 +945,8 @@
 
     // 初始化加载本地存储
     loadPendingFromStorage();
+    // 音频初始化（但不激活）
+    initAudio();
 </script>
 </body>
 </html>
