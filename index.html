@@ -11,7 +11,7 @@
     <!-- SheetJS 用于导出 XLSX -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* 样式与之前版本基本一致，略作调整，但保留所有功能 */
+        /* 样式 - 保持与之前一致，仅作微调 */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -262,7 +262,7 @@
             border-collapse: collapse;
             margin-top: 16px;
             font-size: 0.95rem;
-            min-width: 700px;
+            min-width: 800px;
             background: white;
             border-radius: 20px;
             overflow: hidden;
@@ -315,6 +315,9 @@
             transition: opacity 0.3s;
         }
         .toast-message.show { opacity: 1; }
+        .toast-message.success { background: #10b981; }
+        .toast-message.error { background: #ef4444; }
+        .toast-message.warning { background: #f59e0b; }
         .scan-toast {
             position: fixed;
             top: 100px;
@@ -365,6 +368,43 @@
             padding: 10px 28px;
             cursor: pointer;
         }
+        .auth-container {
+            max-width: 400px;
+            margin: 40px auto;
+            background: white;
+            border-radius: 40px;
+            padding: 30px 24px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+        }
+        .auth-title { font-size: 1.8rem; font-weight: 700; text-align: center; margin-bottom: 8px; }
+        .auth-subtitle { text-align: center; color: #64748b; margin-bottom: 24px; }
+        .auth-form { display: flex; flex-direction: column; gap: 16px; }
+        .auth-form input {
+            padding: 16px 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 40px;
+            font-size: 1rem;
+            background: #f8fafc;
+        }
+        .error-msg { color: #dc2626; font-size: 0.9rem; margin-top: 8px; }
+        .tabs {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 8px 24px;
+            font-size: 1rem;
+            border-radius: 40px;
+            cursor: pointer;
+            color: #64748b;
+            font-weight: 600;
+        }
+        .tab-btn.active { background: #e0f2fe; color: #0369a1; }
+        .auth-footer { text-align: center; margin-top: 20px; cursor: pointer; color: #0284c7; }
         @media (max-width: 640px) {
             .stats-panel { flex-direction: column; align-items: flex-start; }
             .toolbar { flex-direction: column; align-items: stretch; }
@@ -389,20 +429,20 @@
         </div>
 
         <!-- 认证区域 -->
-        <div id="authArea" class="auth-container" style="max-width:400px; margin:40px auto;">
-            <div class="auth-title" style="font-size:1.8rem; font-weight:700; text-align:center;">集派快递</div>
-            <div class="auth-subtitle" style="text-align:center; color:#64748b;">扫码录入快人一步</div>
-            <div class="tabs" style="display:flex; gap:12px; justify-content:center; margin-bottom:24px;">
+        <div id="authArea" class="auth-container">
+            <div class="auth-title">集派快递</div>
+            <div class="auth-subtitle">扫码录入快人一步</div>
+            <div class="tabs">
                 <button id="loginTab" class="tab-btn active">登录</button>
                 <button id="signupTab" class="tab-btn">注册</button>
             </div>
-            <div id="loginForm" class="auth-form" style="display:flex; flex-direction:column; gap:16px;">
+            <div id="loginForm" class="auth-form">
                 <input type="email" id="loginEmail" placeholder="邮箱" required>
                 <input type="password" id="loginPassword" placeholder="密码" required>
                 <button id="loginBtn" class="btn btn-primary">登录</button>
                 <div id="loginError" class="error-msg"></div>
             </div>
-            <div id="signupForm" class="auth-form" style="display:none; flex-direction:column; gap:16px;">
+            <div id="signupForm" class="auth-form" style="display: none;">
                 <input type="text" id="signupUsername" placeholder="用户名（选填）">
                 <input type="email" id="signupEmail" placeholder="邮箱*" required>
                 <input type="password" id="signupPassword" placeholder="密码（至少6位）*" required>
@@ -410,11 +450,11 @@
                 <button id="signupBtn" class="btn btn-primary">注册</button>
                 <div id="signupError" class="error-msg"></div>
             </div>
-            <div class="auth-footer" style="text-align:center; margin-top:20px;">
+            <div class="auth-footer">
                 <span id="switchToSignup">还没有账号？立即注册→</span>
-                <span id="switchToLogin" style="display:none;">已有账号？立即登录</span>
+                <span id="switchToLogin" style="display: none;">已有账号？立即登录</span>
             </div>
-            <button id="localModeBtn" class="btn btn-secondary" style="width:100%; margin-top:20px;">📱 本地模式（无需登录）</button>
+            <button id="localModeBtn" class="btn btn-secondary" style="width:100%; margin-top:20px; background:white; border:1px dashed #94a3b8;">📱 本地模式（无需登录）</button>
         </div>
 
         <!-- 主应用区域 -->
@@ -481,7 +521,7 @@
             <!-- 数据表格 -->
             <div style="overflow-x: auto;">
                 <table id="historyTable">
-                    <thead><tr><th>单号</th><th>快递公司</th><th>扫描时间</th><th>备注</th><th>照片</th><th style="width:80px">操作</th></tr></thead>
+                    <thead><tr><th>单号</th><th>快递公司</th><th>首次扫描</th><th>最新扫描</th><th>次数</th><th>照片</th><th style="width:120px">操作</th></tr></thead>
                     <tbody id="historyBody"></tbody>
                 </table>
             </div>
@@ -521,6 +561,15 @@
 <div id="toast" class="toast-message"></div>
 <div id="scanToast" class="scan-toast"></div>
 
+<!-- 详情模态框（用于查看单号详细记录） -->
+<div id="detailModal" class="modal">
+    <div class="modal-content">
+        <h3 id="detailTitle">单号详情</h3>
+        <div id="detailList" style="max-height: 400px; overflow-y: auto;"></div>
+        <div class="modal-buttons"><button id="detailModalClose" class="btn btn-primary">关闭</button></div>
+    </div>
+</div>
+
 <script>
     // ================== 配置 ==================
     const SUPABASE_URL = 'https://vmkpymrujtvguvmzcisc.supabase.co';
@@ -559,56 +608,504 @@
     let groupedRecords = [];
     let dataSourceMode = 'local';
     let searchKeyword = '';
+    let isLocalMode = false; // 本地模式标志
 
-    // 获取 video 元素（用于拍照）
-    function getVideoElement() {
-        return document.querySelector('#interactive video');
+    // DOM 元素
+    const syncStatusDiv = document.getElementById('syncStatus');
+    const localModeBadge = document.getElementById('localModeBadge');
+    const authArea = document.getElementById('authArea');
+    const mainApp = document.getElementById('mainApp');
+    const userHeader = document.getElementById('userHeader');
+    const userInfoDiv = document.getElementById('userInfo');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const loginTab = document.getElementById('loginTab');
+    const signupTab = document.getElementById('signupTab');
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const loginError = document.getElementById('loginError');
+    const signupError = document.getElementById('signupError');
+    const switchToSignup = document.getElementById('switchToSignup');
+    const switchToLogin = document.getElementById('switchToLogin');
+    const localModeBtn = document.getElementById('localModeBtn');
+    const manualBtn = document.getElementById('manualBtn');
+    const noteInput = document.getElementById('noteInput');
+    const noteOptionsDatalist = document.getElementById('noteOptionsDatalist');
+    const lockToggleBtn = document.getElementById('lockToggleBtn');
+    const testSoundBtn = document.getElementById('testSoundBtn');
+    const currentResult = document.getElementById('currentResult');
+    const trackingSpan = document.getElementById('trackingNumber');
+    const carrierSpan = document.getElementById('carrier');
+    const scannedAtSpan = document.getElementById('scannedAt');
+    const duplicateHint = document.getElementById('duplicateHint');
+    const photoHint = document.getElementById('photoHint');
+    const historyBody = document.getElementById('historyBody');
+    const noDataMsg = document.getElementById('noDataMsg');
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const exportXlsxBtn = document.getElementById('exportXlsxBtn');
+    const startScanBtn = document.getElementById('startScanBtn');
+    const pauseScanBtn = document.getElementById('pauseScanBtn');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearRangeSelect = document.getElementById('clearRangeSelect');
+    const clearRangeBtn = document.getElementById('clearRangeBtn');
+    const totalCountSpan = document.getElementById('totalCount');
+    const uniqueCountSpan = document.getElementById('uniqueCount');
+    const carrierStatsDiv = document.getElementById('carrierStats');
+    const toast = document.getElementById('toast');
+    const soundToggleBtn = document.getElementById('soundToggleBtn');
+    const scanToast = document.getElementById('scanToast');
+    const manualModal = document.getElementById('manualModal');
+    const manualModalInput = document.getElementById('manualModalInput');
+    const manualModalCancel = document.getElementById('manualModalCancel');
+    const manualModalConfirm = document.getElementById('manualModalConfirm');
+    const searchModal = document.getElementById('searchModal');
+    const searchInput = document.getElementById('searchInput');
+    const scanSearchBtn = document.getElementById('scanSearchBtn');
+    const searchModalCancel = document.getElementById('searchModalCancel');
+    const searchModalConfirm = document.getElementById('searchModalConfirm');
+    const detailModal = document.getElementById('detailModal');
+    const detailTitle = document.getElementById('detailTitle');
+    const detailList = document.getElementById('detailList');
+    const detailModalClose = document.getElementById('detailModalClose');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const pageInfo = document.getElementById('pageInfo');
+    const dataSourceLocal = document.getElementById('dataSourceLocal');
+    const dataSourceCloud = document.getElementById('dataSourceCloud');
+    const dataSourceAll = document.getElementById('dataSourceAll');
+
+    // ================== 声音开关 ==================
+    function loadSoundPreference() {
+        const saved = localStorage.getItem('soundEnabled');
+        if (saved !== null) soundEnabled = saved === 'true';
+        speechEnabled = soundEnabled;
+        updateSoundButton();
+    }
+    function saveSoundPreference() { localStorage.setItem('soundEnabled', soundEnabled); }
+    function toggleSound() {
+        soundEnabled = !soundEnabled;
+        speechEnabled = soundEnabled;
+        saveSoundPreference();
+        updateSoundButton();
+        showToast(soundEnabled ? '声音提醒已开启' : '声音提醒已关闭', 'success');
+        if (soundEnabled) speak('声音已开启');
+    }
+    function updateSoundButton() {
+        soundToggleBtn.className = soundEnabled ? 'sound-toggle on' : 'sound-toggle off';
+        soundToggleBtn.innerHTML = soundEnabled ? '🔊 声音' : '🔇 声音';
+    }
+    soundToggleBtn.addEventListener('click', toggleSound);
+
+    // ================== 语音朗读 ==================
+    function speak(text) {
+        if (!speechEnabled) return;
+        if (!window.speechSynthesis) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 1.2;
+        utterance.pitch = 1.5;
+        const voices = window.speechSynthesis.getVoices();
+        const femaleVoice = voices.find(v => v.lang.includes('zh') && v.name.includes('Female'));
+        if (femaleVoice) utterance.voice = femaleVoice;
+        window.speechSynthesis.speak(utterance);
+    }
+    testSoundBtn.addEventListener('click', () => { speak('测试声音'); showToast('测试声音已播放', 'info'); });
+
+    // ================== 震动 ==================
+    function vibrate(type) {
+        if (!soundEnabled || !navigator.vibrate) return;
+        if (type === 'success') navigator.vibrate(50);
+        else if (type === 'repeat') navigator.vibrate(100);
+        else navigator.vibrate([100, 50, 100]);
     }
 
-    // 拍照并上传到 Supabase Storage
-    async function captureAndUploadPhoto() {
-        const video = getVideoElement();
-        if (!video || video.readyState < 2) {
-            console.warn('摄像头未就绪，无法拍照');
-            return null;
+    function showToast(message, type = 'success', duration = 2000) {
+        toast.className = `toast-message show ${type}`;
+        toast.textContent = message;
+        setTimeout(() => toast.classList.remove('show'), duration);
+    }
+    function showScanToast(code) {
+        scanToast.className = 'scan-toast show';
+        scanToast.textContent = `📦 ${code}`;
+        setTimeout(() => scanToast.classList.remove('show'), 2000);
+    }
+
+    // ================== 备注锁定 ==================
+    function updateLockUI() {
+        if (noteLocked) {
+            lockToggleBtn.className = 'lock-toggle locked';
+            lockToggleBtn.innerHTML = '🔒 锁定';
+            noteInput.disabled = true;
+            noteInput.value = lockedNote;
+        } else {
+            lockToggleBtn.className = 'lock-toggle unlocked';
+            lockToggleBtn.innerHTML = '🔓 锁定';
+            noteInput.disabled = false;
+            noteInput.value = '';
         }
-        // 创建 canvas 并绘制当前帧
+    }
+    function toggleLock() {
+        if (noteLocked) { noteLocked = false; }
+        else { lockedNote = noteInput.value; noteLocked = true; }
+        updateLockUI();
+        showToast(noteLocked ? '备注已锁定' : '备注已解锁', 'success');
+    }
+    function getCurrentNote() { return noteLocked ? lockedNote : noteInput.value; }
+    lockToggleBtn.addEventListener('click', toggleLock);
+
+    // ================== 备注选项加载 ==================
+    async function loadNoteOptions() {
+        try {
+            const { data, error } = await sbClient.from('note_options').select('*').order('id');
+            if (error) throw error;
+            noteOptions = data || [];
+            noteOptionsDatalist.innerHTML = noteOptions.map(opt => `<option value="${opt.option_text}">`).join('');
+        } catch (err) { console.error('加载备注选项失败', err); }
+    }
+
+    // ================== 手动输入 ==================
+    manualBtn.addEventListener('click', () => {
+        if (speechEnabled) speak('输入');
+        manualModalInput.value = '';
+        manualModal.classList.add('show');
+        manualModalInput.focus();
+    });
+    manualModalCancel.addEventListener('click', () => manualModal.classList.remove('show'));
+    manualModalConfirm.addEventListener('click', () => {
+        const code = manualModalInput.value.trim();
+        if (code) { handleTrackingNumber(code); manualModal.classList.remove('show'); }
+        else showToast('请输入单号', 'warning');
+    });
+    manualModalInput.addEventListener('keypress', e => { if (e.key === 'Enter') manualModalConfirm.click(); });
+    manualModal.addEventListener('click', e => { if (e.target === manualModal) manualModal.classList.remove('show'); });
+
+    // ================== 搜索 ==================
+    searchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchModal.classList.add('show');
+        searchInput.focus();
+    });
+    searchModalCancel.addEventListener('click', () => searchModal.classList.remove('show'));
+    searchModalConfirm.addEventListener('click', () => {
+        searchKeyword = searchInput.value.trim();
+        searchModal.classList.remove('show');
+        applyDataSource();
+    });
+    searchInput.addEventListener('keypress', e => { if (e.key === 'Enter') searchModalConfirm.click(); });
+    scanSearchBtn.addEventListener('click', () => {
+        const wasScanning = isScanning;
+        if (wasScanning) pauseScanner();
+        Quagga.init({
+            inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#interactive'), constraints: { width: 640, height: 480, facingMode: "environment" } },
+            decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","code_39_reader","codabar_reader","upc_reader","i2of5_reader"] }
+        }, (err) => {
+            if (err) { showToast('无法启动摄像头', 'error'); return; }
+            Quagga.start(); showToast('请扫描条码', 'info');
+            const onDetected = (result) => {
+                const code = result.codeResult.code;
+                if (code) {
+                    Quagga.stop();
+                    Quagga.offDetected(onDetected);
+                    searchInput.value = code;
+                    if (wasScanning) startScanner();
+                }
+            };
+            Quagga.onDetected(onDetected);
+        });
+    });
+    searchModal.addEventListener('click', e => { if (e.target === searchModal) searchModal.classList.remove('show'); });
+
+    // ================== 详情模态框 ==================
+    function showDetailModal(trackingNumber, records) {
+        detailTitle.innerText = `单号详情 - ${trackingNumber}`;
+        detailList.innerHTML = '';
+        records.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+        records.forEach(rec => {
+            const div = document.createElement('div');
+            div.className = 'modal-list-item';
+            div.innerHTML = `
+                <div><div>${new Date(rec.scanned_at).toLocaleString()}</div><small>备注: ${rec.notes || '无'}</small>${rec.photo_url ? '<br><img src="'+rec.photo_url+'" style="max-width:100px; margin-top:8px;">' : ''}</div>
+                <div><button class="copy-btn" data-code="${escapeHtml(rec.tracking_number)}">📋</button><button class="delete-btn" data-localid="${rec.localId || ''}" data-cloudid="${rec.id || ''}">🗑️</button></div>
+            `;
+            detailList.appendChild(div);
+        });
+        detailList.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', e => { navigator.clipboard.writeText(e.target.dataset.code).then(() => showToast('单号已复制')); });
+        });
+        detailList.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', async e => {
+                const localId = e.target.dataset.localid, cloudId = e.target.dataset.cloudid;
+                if (confirm('确定删除这条记录？')) {
+                    await deleteRecord(localId, cloudId);
+                    detailModal.classList.remove('show');
+                }
+            });
+        });
+        detailModal.classList.add('show');
+    }
+    detailModalClose.addEventListener('click', () => detailModal.classList.remove('show'));
+    detailModal.addEventListener('click', e => { if (e.target === detailModal) detailModal.classList.remove('show'); });
+
+    // ================== 本地存储 ==================
+    const STORAGE_KEY = 'pending_scans';
+    function loadPendingFromStorage() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) { try { pendingRecords = JSON.parse(stored); } catch(e){ pendingRecords=[]; } }
+        else pendingRecords = [];
+    }
+    function savePendingToStorage() { localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingRecords)); }
+    function addPendingRecord(record) {
+        const localId = Date.now() + '-' + Math.random().toString(36).substr(2,9);
+        pendingRecords.unshift({ ...record, localId, pending: true });
+        savePendingToStorage();
+        updateSyncStatusUI();
+    }
+
+    // ================== 同步状态 ==================
+    function updateSyncStatusUI() {
+        if (isLocalMode) {
+            syncStatusDiv.style.display = 'none';
+            localModeBadge.style.display = 'flex';
+            return;
+        }
+        syncStatusDiv.style.display = 'flex';
+        localModeBadge.style.display = 'none';
+        if (!isOnline) syncStatusDiv.className = 'sync-status offline';
+        else syncStatusDiv.className = pendingRecords.length ? 'sync-status syncing' : 'sync-status online';
+        syncStatusDiv.innerHTML = !isOnline ? `🔴 离线 <span class="badge">${pendingRecords.length}</span>` : pendingRecords.length ? `🟡 待同步 <span class="badge">${pendingRecords.length}</span>` : '🟢 在线';
+    }
+    window.addEventListener('online', () => { isOnline=true; updateSyncStatusUI(); if (!isLocalMode && currentUser) syncPendingRecords(); });
+    window.addEventListener('offline', () => { isOnline=false; updateSyncStatusUI(); });
+
+    async function syncPendingRecords() {
+        if (isLocalMode || !currentUser || !isOnline || pendingRecords.length===0) return;
+        syncStatusDiv.innerHTML = '🟡 同步中...';
+        for (const record of pendingRecords) {
+            try {
+                const { error } = await sbClient.from('scans').insert([{
+                    tracking_number: record.tracking_number,
+                    carrier: record.carrier,
+                    notes: record.notes || '',
+                    photo_url: record.photo_url || null,
+                    scanned_at: record.scanned_at,
+                    user_id: currentUser.id
+                }]);
+                if (!error) pendingRecords = pendingRecords.filter(r => r.localId !== record.localId);
+            } catch (e) {}
+        }
+        savePendingToStorage();
+        updateSyncStatusUI();
+        if (dataSourceMode !== 'local') await loadCloudData();
+        applyDataSource();
+        speak('同步完成');
+    }
+
+    async function loadCloudData() {
+        if (isLocalMode || !currentUser) return;
+        try {
+            const { data, error } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id).order('scanned_at', { ascending: false });
+            if (error) throw error;
+            cloudData = (data || []).map(item => ({ ...item, localId: null, pending: false }));
+            cloudDataLoaded = true;
+        } catch (err) { console.error('加载云端数据失败', err); showToast('加载云端数据失败', 'error'); }
+    }
+
+    // ================== 分组 ==================
+    function groupRecords(records) {
+        const groups = {};
+        records.forEach(rec => {
+            const num = rec.tracking_number;
+            if (!groups[num]) {
+                groups[num] = { tracking_number: num, records: [], carrier: rec.carrier, first_time: rec.scanned_at, last_time: rec.scanned_at, count:0 };
+            }
+            groups[num].records.push(rec);
+            if (new Date(rec.scanned_at) < new Date(groups[num].first_time)) groups[num].first_time = rec.scanned_at;
+            if (new Date(rec.scanned_at) > new Date(groups[num].last_time)) {
+                groups[num].last_time = rec.scanned_at;
+                groups[num].carrier = rec.carrier;
+            }
+            groups[num].count++;
+        });
+        return Object.values(groups).sort((a,b) => new Date(b.last_time) - new Date(a.last_time));
+    }
+
+    // ================== 数据源应用 ==================
+    function applyDataSource() {
+        let baseRecords = [];
+        if (isLocalMode) baseRecords = pendingRecords;
+        else {
+            const combined = [...pendingRecords];
+            if (cloudDataLoaded) combined.push(...cloudData);
+            baseRecords = combined;
+        }
+        if (dataSourceMode === 'local') {
+            baseRecords = isLocalMode ? pendingRecords : baseRecords.filter(r => new Date(r.scanned_at) >= sessionStartTime);
+        } else if (dataSourceMode === 'cloud') {
+            baseRecords = (isLocalMode || !cloudDataLoaded) ? [] : [...cloudData];
+        } else {
+            // all
+            baseRecords = isLocalMode ? pendingRecords : [...pendingRecords, ...(cloudDataLoaded ? cloudData : [])];
+        }
+        if (searchKeyword) {
+            const kw = searchKeyword.toLowerCase();
+            baseRecords = baseRecords.filter(r => r.tracking_number.toLowerCase().includes(kw) || (r.carrier && r.carrier.toLowerCase().includes(kw)));
+        }
+        groupedRecords = groupRecords(baseRecords);
+        allRecords = baseRecords;
+        renderStats(allRecords);
+        currentPage = 1;
+        renderPage();
+    }
+
+    function renderStats(records) {
+        totalCountSpan.innerText = records.length;
+        uniqueCountSpan.innerText = new Set(records.map(r => r.tracking_number)).size;
+        const carrierCount = {};
+        records.forEach(r => { const c = r.carrier || '未知'; carrierCount[c] = (carrierCount[c]||0)+1; });
+        carrierStatsDiv.innerHTML = Object.entries(carrierCount).map(([n,c]) => `<span class="carrier-stat">${n}: ${c}</span>`).join('');
+    }
+
+    function renderPage() {
+        const totalPages = Math.ceil(groupedRecords.length / pageSize) || 1;
+        if (currentPage<1) currentPage=1; if (currentPage>totalPages) currentPage=totalPages;
+        const start = (currentPage-1)*pageSize;
+        const end = start+pageSize;
+        const pageGroups = groupedRecords.slice(start,end);
+        renderGroupTable(pageGroups);
+        pageInfo.innerText = `第 ${currentPage} 页 / 共 ${totalPages} 页`;
+        prevPageBtn.disabled = currentPage <= 1;
+        nextPageBtn.disabled = currentPage >= totalPages;
+    }
+
+    function renderGroupTable(groups) {
+        if (groups.length === 0) { historyBody.innerHTML = ''; noDataMsg.style.display = 'block'; return; }
+        noDataMsg.style.display = 'none';
+        historyBody.innerHTML = groups.map(group => {
+            const hasPhoto = group.records.some(r => r.photo_url) ? '📸' : '无';
+            return `
+            <tr>
+                <td>${escapeHtml(group.tracking_number)}</td>
+                <td><span class="carrier-badge">${escapeHtml(group.carrier || '未知')}</span></td>
+                <td>${new Date(group.first_time).toLocaleString()}</td>
+                <td>${new Date(group.last_time).toLocaleString()}</td>
+                <td>${group.count}</td>
+                <td>${hasPhoto}</td>
+                <td><button class="detail-btn" data-number="${escapeHtml(group.tracking_number)}">📋 详情</button></td>
+            </tr>
+        `}).join('');
+        document.querySelectorAll('.detail-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const number = e.target.dataset.number;
+                const group = groupedRecords.find(g => g.tracking_number === number);
+                if (group) showDetailModal(number, group.records);
+            });
+        });
+    }
+
+    async function deleteRecord(localId, cloudId) {
+        if (localId) { pendingRecords = pendingRecords.filter(r => r.localId !== localId); savePendingToStorage(); }
+        if (!isLocalMode && cloudId) {
+            try { await sbClient.from('scans').delete().eq('id', cloudId).eq('user_id', currentUser.id); if (cloudDataLoaded) cloudData = cloudData.filter(r => r.id !== cloudId); }
+            catch (err) { showToast('删除失败', 'error'); return false; }
+        }
+        return true;
+    }
+
+    function findLastScanTime(trackingNumber) {
+        const records = allRecords.filter(r => r.tracking_number === trackingNumber);
+        if (!records.length) return null;
+        records.sort((a,b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+        return new Date(records[0].scanned_at);
+    }
+
+    // ================== 按范围删除 ==================
+    async function clearRecordsByRange() {
+        const range = clearRangeSelect.value;
+        let startTime = null, rangeDesc = '';
+        if (range === 'session') {
+            if (isLocalMode) { showToast('本地模式无法按本次登录删除', 'warning'); return; }
+            if (!sessionStartTime) { showToast('无法确定本次登录时间', 'error'); return; }
+            startTime = sessionStartTime; rangeDesc = '本次扫码';
+        } else if (range === 'day') { startTime = new Date(Date.now()-24*60*60*1000); rangeDesc = '最近一天'; }
+        else if (range === 'week') { startTime = new Date(Date.now()-7*24*60*60*1000); rangeDesc = '最近一周'; }
+        else { startTime = null; rangeDesc = '全部'; }
+
+        let toDelete = startTime ? allRecords.filter(r => new Date(r.scanned_at) >= startTime) : allRecords;
+        if (toDelete.length === 0) { showToast('所选范围内没有记录', 'warning'); return; }
+        if (!confirm(`确定删除 ${rangeDesc} 的 ${toDelete.length} 条记录吗？`)) return;
+
+        if (!isLocalMode && isOnline && currentUser) {
+            try {
+                let query = sbClient.from('scans').delete().eq('user_id', currentUser.id);
+                if (startTime) query = query.gte('scanned_at', startTime.toISOString());
+                await query;
+            } catch (err) { showToast('删除云端失败', 'error'); return; }
+        }
+        if (startTime) pendingRecords = pendingRecords.filter(r => new Date(r.scanned_at) < startTime);
+        else pendingRecords = [];
+        savePendingToStorage();
+        if (!isLocalMode && cloudDataLoaded) await loadCloudData();
+        applyDataSource();
+        updateSyncStatusUI();
+    }
+
+    // ================== 数据源切换 ==================
+    function setDataSource(mode) {
+        dataSourceMode = mode;
+        [dataSourceLocal, dataSourceCloud, dataSourceAll].forEach(btn => btn.classList.remove('active'));
+        if (mode === 'local') dataSourceLocal.classList.add('active');
+        else if (mode === 'cloud') dataSourceCloud.classList.add('active');
+        else dataSourceAll.classList.add('active');
+        if (!isLocalMode && (mode === 'cloud' || mode === 'all') && !cloudDataLoaded) {
+            loadCloudData().then(() => applyDataSource());
+        } else applyDataSource();
+    }
+    dataSourceLocal.addEventListener('click', () => setDataSource('local'));
+    dataSourceCloud.addEventListener('click', () => setDataSource('cloud'));
+    dataSourceAll.addEventListener('click', () => setDataSource('all'));
+
+    // ================== 限制检查 ==================
+    async function checkLimits(trackingNumber) {
+        const localCount = pendingRecords.filter(r => r.tracking_number === trackingNumber).length;
+        if (localCount >= 3) return { allowed: false, reason: '本设备上该单号已扫描3次' };
+        if (isLocalMode || !isOnline || !currentUser) return { allowed: true };
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        try {
+            const { count: dayCount } = await sbClient.from('scans').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id).eq('tracking_number', trackingNumber).gte('scanned_at', startOfDay);
+            const { count: monthCount } = await sbClient.from('scans').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id).eq('tracking_number', trackingNumber).gte('scanned_at', startOfMonth);
+            if (dayCount >= 6) return { allowed: false, reason: '当天该单号已扫描6次' };
+            if (monthCount >= 10) return { allowed: false, reason: '当月该单号已扫描10次' };
+            return { allowed: true };
+        } catch (err) { return { allowed: true }; }
+    }
+
+    // ================== 拍照上传 ==================
+    function getVideoElement() { return document.querySelector('#interactive video'); }
+    async function captureAndUploadPhoto() {
+        if (!currentUser || isLocalMode) return null;
+        const video = getVideoElement();
+        if (!video || video.readyState < 2) { console.warn('摄像头未就绪'); return null; }
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        // 转换为 blob
-        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8));
         if (!blob) return null;
-
-        // 生成文件名：用户ID/时间戳-随机数.jpg
         const fileName = `${currentUser.id}/${Date.now()}-${Math.random().toString(36).substring(2)}.jpg`;
-        // 上传
-        const { error } = await sbClient.storage.from('scan-photos').upload(fileName, blob, {
-            contentType: 'image/jpeg',
-            cacheControl: '3600'
-        });
-        if (error) {
-            console.error('照片上传失败', error);
-            return null;
-        }
-        // 获取公共 URL
+        const { error } = await sbClient.storage.from('scan-photos').upload(fileName, blob, { contentType: 'image/jpeg', cacheControl: '3600' });
+        if (error) { console.error('照片上传失败', error); return null; }
         const { data: { publicUrl } } = sbClient.storage.from('scan-photos').getPublicUrl(fileName);
         return publicUrl;
     }
 
-    // 保存扫描记录（含照片URL）
     async function saveScanWithPhoto(trackingNumber, carrier, notes, photoUrl) {
-        if (!currentUser) return false;
-        const record = {
-            tracking_number: trackingNumber,
-            carrier,
-            notes,
-            photo_url: photoUrl,
-            scanned_at: new Date().toISOString()
-        };
-        if (isOnline && !isLocalMode) {
+        if (!currentUser && !isLocalMode) return false;
+        const record = { tracking_number: trackingNumber, carrier, notes, photo_url: photoUrl, scanned_at: new Date().toISOString() };
+        if (!isLocalMode && isOnline && currentUser) {
             try {
                 await sbClient.from('scans').insert([{ ...record, user_id: currentUser.id }]);
                 if (cloudDataLoaded) await loadCloudData();
@@ -626,59 +1123,39 @@
         }
     }
 
-    // 重写 handleTrackingNumber，加入拍照逻辑
+    // ================== 处理扫码结果 ==================
     async function handleTrackingNumber(trackingNumber) {
         const now = Date.now();
-        if (trackingNumber === lastScannedCode && (now - lastScanTime) < 5000) {
-            speak('重复');
-            vibrate('repeat');
+        if (trackingNumber === lastScannedCode && now - lastScanTime < 5000) {
+            speak('重复'); vibrate('repeat');
             showToast('⚠️ 5秒内重复扫码，已忽略', 'warning');
             return;
         }
         lastScannedCode = trackingNumber;
         lastScanTime = now;
-
         const carrier = detectCarrier(trackingNumber);
-        if (carrier === null) {
-            speak('错误');
-            vibrate('error');
+        if (!carrier) {
+            speak('错误'); vibrate('error');
             showToast('❌ 无效的快递单号', 'error');
             currentResult.style.display = 'none';
             return;
         }
-
         const limitCheck = await checkLimits(trackingNumber);
-        if (!limitCheck.allowed) {
-            if (!confirm(`⚠️ 限制提醒：${limitCheck.reason}。是否仍然保存？`)) {
-                speak('已取消');
-                showToast('保存已取消', 'warning');
-                return;
-            }
+        if (!limitCheck.allowed && !confirm(`⚠️ 限制提醒：${limitCheck.reason}。是否仍然保存？`)) {
+            speak('已取消'); showToast('保存已取消', 'warning'); return;
         }
-
         const note = getCurrentNote();
         const lastTime = findLastScanTime(trackingNumber);
         const isDuplicate = lastTime !== null;
-
         let photoUrl = null;
-        // 如果在线且已登录（非本地模式），尝试拍照上传
-        if (isOnline && currentUser && !isLocalMode) {
+        if (!isLocalMode && isOnline && currentUser) {
             photoUrl = await captureAndUploadPhoto();
-            if (photoUrl) {
-                showToast('照片已上传', 'success');
-                document.getElementById('photoHint').innerText = '📸 已拍照';
-            } else {
-                document.getElementById('photoHint').innerText = '📸 拍照失败';
-            }
+            photoHint.innerText = photoUrl ? '📸 已拍照' : '📸 拍照失败';
         } else {
-            document.getElementById('photoHint').innerText = '';
+            photoHint.innerText = '';
         }
-
-        // 保存记录
         await saveScanWithPhoto(trackingNumber, carrier, note, photoUrl);
-
         if (isDuplicate) { speak('重复'); vibrate('repeat'); } else { speak('成功'); vibrate('success'); }
-
         showScanToast(trackingNumber);
         currentResult.style.display = 'block';
         trackingSpan.innerText = trackingNumber;
@@ -688,15 +1165,201 @@
         showToast(isDuplicate ? '重复扫描，已保存' : '扫描成功', isDuplicate ? 'warning' : 'success');
     }
 
-    // 其余函数（语音、震动、存储、同步、数据源切换、用户认证等）与之前版本完全相同，篇幅所限省略，但实际代码中需完整保留。
-    // 为节省篇幅，此处省略重复代码，实际使用时请将之前版本中的完整函数复制过来。
-    // 关键点是修改了 saveScan 为 saveScanWithPhoto 并替换了 handleTrackingNumber。
-    // 以下省略号表示需要填充之前的所有代码逻辑。
-    // ... (完整代码请参考最终版整合)
+    function detectCarrier(tn) {
+        for (let r of carrierRules) if (r.regex.test(tn)) return r.name;
+        return null;
+    }
 
-    // 注意：由于篇幅限制，此处仅展示新增和修改的核心部分。
-    // 实际部署时，请使用包含所有原有功能的完整代码，并将 handleTrackingNumber 和保存函数替换为上述版本。
-    // 完整代码可从历史消息中获取，并按照上述修改整合。
+    // ================== 扫码初始化 ==================
+    let quaggaInitialized = false, quaggaInitPending = false;
+    function initScanner(cb) {
+        if (quaggaInitPending) { setTimeout(() => initScanner(cb), 200); return; }
+        quaggaInitPending = true;
+        Quagga.init({
+            inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#interactive'), constraints: { width: 640, height: 480, facingMode: "environment" } },
+            decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","code_39_reader","codabar_reader","upc_reader","i2of5_reader"] }
+        }, err => {
+            quaggaInitPending = false;
+            if (err) { showToast('无法启动摄像头', 'error'); if (cb) cb(false); }
+            else { quaggaInitialized = true; if (cb) cb(true); }
+        });
+    }
+    function startScanner() {
+        if (!currentUser && !isLocalMode) return;
+        if (speechEnabled) speak('扫码启动');
+        try { Quagga.stop(); } catch(e) {}
+        quaggaInitialized = false; quaggaInitPending = false;
+        initScanner(success => {
+            if (success) {
+                setTimeout(() => { Quagga.start(); isScanning = true; updateScanButtons(); showToast('扫码已启动', 'success'); }, 100);
+            } else showToast('启动摄像头失败', 'error');
+        });
+    }
+    function pauseScanner() {
+        if (quaggaInitialized && isScanning) {
+            Quagga.stop(); isScanning = false; updateScanButtons();
+            if (speechEnabled) speak('扫码暂停');
+            showToast('扫码已暂停', 'warning');
+        }
+    }
+    function updateScanButtons() {
+        if (isScanning) { startScanBtn.style.display = 'none'; pauseScanBtn.style.display = 'inline-block'; }
+        else { startScanBtn.style.display = 'inline-block'; pauseScanBtn.style.display = 'none'; }
+    }
+    Quagga.onDetected(result => {
+        if (!isScanning || (!currentUser && !isLocalMode)) return;
+        const code = result.codeResult.code;
+        if (code) handleTrackingNumber(code);
+    });
+
+    // ================== 用户认证 ==================
+    function showAuth() {
+        authArea.style.display = 'block';
+        mainApp.style.display = 'none';
+        userHeader.style.display = 'none';
+        if (quaggaInitialized && isScanning) Quagga.stop();
+    }
+    function showApp(user) {
+        authArea.style.display = 'none';
+        mainApp.style.display = 'block';
+        userHeader.style.display = 'flex';
+        userInfoDiv.innerText = `👤 ${user.email}`;
+        if (isLocalMode) {
+            dataSourceCloud.disabled = true;
+            syncStatusDiv.style.display = 'none';
+            localModeBadge.style.display = 'flex';
+        } else {
+            dataSourceCloud.disabled = false;
+            syncStatusDiv.style.display = 'flex';
+            localModeBadge.style.display = 'none';
+        }
+        loadPendingFromStorage();
+        updateScanButtons();
+        loadNoteOptions();
+        noteLocked = false; lockedNote = ''; noteInput.value = ''; updateLockUI();
+        if (isLocalMode) {
+            cloudDataLoaded = false; cloudData = [];
+            applyDataSource();
+        } else {
+            sessionStartTime = new Date();
+            setDataSource('local');
+        }
+    }
+    function enterLocalMode() {
+        currentUser = null;
+        isLocalMode = true;
+        userInfoDiv.innerText = '📱 本地模式';
+        showApp(null);
+    }
+    async function handleLoginSuccess(user) {
+        currentUser = user;
+        isLocalMode = false;
+        sessionStartTime = new Date();
+        showApp(user);
+        // 自动同步本地记录
+        if (pendingRecords.length > 0) {
+            speak('开始同步本地记录');
+            await syncPendingRecords();
+        } else loadCloudData();
+    }
+
+    sbClient.auth.onAuthStateChange((event, session) => {
+        if (session && !isLocalMode) { currentUser = session.user; handleLoginSuccess(currentUser); }
+        else if (!session && !isLocalMode) { currentUser = null; showAuth(); }
+    });
+    sbClient.auth.getSession().then(({ data: { session } }) => {
+        if (session) { currentUser = session.user; handleLoginSuccess(currentUser); }
+        else showAuth();
+    });
+
+    loginBtn.addEventListener('click', async () => {
+        const email = loginEmail.value.trim();
+        const password = loginPassword.value;
+        loginError.innerText = '';
+        try {
+            const { error } = await sbClient.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+        } catch (err) {
+            loginError.innerText = err.message; // 显示错误信息
+        }
+    });
+
+    signupBtn.addEventListener('click', async () => {
+        const email = signupEmail.value.trim();
+        const password = signupPassword.value;
+        const confirm = signupConfirm.value;
+        if (password !== confirm) { signupError.innerText = '两次密码不一致'; return; }
+        signupError.innerText = '';
+        try {
+            const { error } = await sbClient.auth.signUp({ email, password });
+            if (error) throw error;
+            showToast('注册成功！请登录', 'success');
+            loginTab.click();
+        } catch (err) { signupError.innerText = err.message; }
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+        if (!isLocalMode) { pauseScanner(); await sbClient.auth.signOut(); }
+        currentUser = null; isLocalMode = false; showAuth();
+    });
+
+    // 登录/注册界面切换
+    loginTab.addEventListener('click', () => {
+        loginTab.classList.add('active'); signupTab.classList.remove('active');
+        loginForm.style.display = 'flex'; signupForm.style.display = 'none';
+        switchToSignup.style.display = 'inline'; switchToLogin.style.display = 'none';
+    });
+    signupTab.addEventListener('click', () => {
+        signupTab.classList.add('active'); loginTab.classList.remove('active');
+        signupForm.style.display = 'flex'; loginForm.style.display = 'none';
+        switchToLogin.style.display = 'inline'; switchToSignup.style.display = 'none';
+    });
+    switchToSignup.addEventListener('click', () => signupTab.click());
+    switchToLogin.addEventListener('click', () => loginTab.click());
+    localModeBtn.addEventListener('click', enterLocalMode);
+
+    // ================== 其他事件 ==================
+    startScanBtn.addEventListener('click', startScanner);
+    pauseScanBtn.addEventListener('click', pauseScanner);
+    clearRangeBtn.addEventListener('click', clearRecordsByRange);
+    prevPageBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderPage(); } });
+    nextPageBtn.addEventListener('click', () => { if (currentPage < Math.ceil(groupedRecords.length/pageSize)) { currentPage++; renderPage(); } });
+    syncStatusDiv.addEventListener('click', () => {
+        if (isLocalMode) return;
+        if (isOnline && pendingRecords.length > 0) { speak('开始同步'); syncPendingRecords(); }
+        else if (!isOnline) { speak('离线无法同步'); showToast('当前处于离线状态，无法同步', 'error'); }
+        else { speak('所有记录已同步'); showToast('所有记录已同步', 'success'); }
+    });
+    exportCsvBtn.addEventListener('click', async () => {
+        let records = allRecords;
+        if (!records.length) { showToast('暂无数据', 'warning'); return; }
+        const headers = ['单号','快递公司','扫描时间','备注','照片'];
+        const rows = records.map(r => [r.tracking_number, r.carrier||'', new Date(r.scanned_at).toLocaleString(), r.notes||'', r.photo_url||'']);
+        const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `快递记录_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    });
+    exportXlsxBtn.addEventListener('click', async () => {
+        let records = allRecords;
+        if (!records.length) { showToast('暂无数据', 'warning'); return; }
+        const data = records.map(r => ({ '单号': r.tracking_number, '快递公司': r.carrier||'', '扫描时间': new Date(r.scanned_at).toLocaleString(), '备注': r.notes||'', '照片': r.photo_url||'' }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '扫描记录');
+        XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
+    });
+
+    // ================== 工具函数 ==================
+    function escapeHtml(unsafe) { return unsafe.replace(/[&<>"']/g, m => { if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; if(m==='"') return '&quot;'; if(m==="'") return '&#039;'; return m; }); }
+
+    // 初始化
+    loadPendingFromStorage();
+    loadSoundPreference();
+    if (window.speechSynthesis) window.speechSynthesis.getVoices();
 </script>
 </body>
 </html>
