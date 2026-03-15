@@ -277,6 +277,8 @@
         }
         .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
         .settings-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; margin-left: 8px; }
+        .delete-user-btn { background: none; border: none; color: #ef4444; font-size: 1.2rem; cursor: pointer; margin-left: 4px; }
+        .delete-user-btn:hover { color: #b91c1c; }
         @media (max-width: 640px) {
             .filter-bar { flex-direction: column; align-items: stretch; }
             .filter-group { width: 100%; }
@@ -385,7 +387,7 @@
                 </div>
             </div>
 
-            <!-- 用户管理面板（初始隐藏） -->
+            <!-- 用户管理面板 -->
             <div id="usersPanel" style="display: none;">
                 <div class="filter-bar">
                     <div class="filter-actions" style="margin-left: auto;">
@@ -457,7 +459,7 @@
 <script>
     // ================== 配置 ==================
     const SUPABASE_URL = 'https://vmkpymrujtvguvmzcisc.supabase.co';
-    const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu'; // 请确认此密钥正确
+    const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu'; // 你的匿名密钥
     const ADMIN_EMAIL = 'admin@example.com'; // 管理员邮箱
 
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -543,7 +545,6 @@
         });
     }
 
-    // ================== 判断是否为管理员 ==================
     function isAdmin(user) {
         return user && user.email === ADMIN_EMAIL;
     }
@@ -639,7 +640,6 @@
         `).join('');
     }
 
-    // ================== 导出 XLSX ==================
     function exportToXLSX() {
         if (filteredRecords.length === 0) {
             showToast('没有数据可导出', 'warning');
@@ -657,11 +657,10 @@
         XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
-    // ================== 用户管理（通过 Edge Function）==================
+    // ================== 用户管理 ==================
     async function loadUsers() {
         if (!isAdmin(currentUser)) return;
         try {
-            // 调用 Edge Function（函数名必须为 'clever-action'，与部署一致）
             const { data, error } = await sbClient.functions.invoke('clever-action', {
                 method: 'GET',
             });
@@ -702,6 +701,7 @@
                 <td>
                     <button class="btn btn-sm edit-user" data-id="${u.id}" data-email="${escapeHtml(u.email)}">✏️ 编辑</button>
                     <button class="btn btn-sm reset-pwd" data-id="${u.id}">🔑 重置密码</button>
+                    <button class="delete-user-btn" data-id="${u.id}" title="删除用户">🗑️</button>
                 </td>
             </tr>
         `).join('');
@@ -727,11 +727,29 @@
                             body: { password: newPwd }
                         });
                         showToast('密码已重置', 'success');
+                        loadUsers(); // 刷新列表
                     } catch (err) {
                         showToast(err.message, 'error');
                     }
                 } else if (newPwd) {
                     showToast('密码至少6位', 'warning');
+                }
+            });
+        });
+
+        // 绑定删除事件
+        document.querySelectorAll('.delete-user-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const id = e.target.dataset.id;
+                if (!confirm('确定要删除该用户吗？此操作不可撤销。')) return;
+                try {
+                    await sbClient.functions.invoke(`clever-action/${id}`, {
+                        method: 'DELETE'
+                    });
+                    showToast('用户已删除', 'success');
+                    loadUsers(); // 刷新列表
+                } catch (err) {
+                    showToast(err.message, 'error');
                 }
             });
         });
@@ -749,7 +767,7 @@
     function openEditUserModal(id, email) {
         userModalTitle.innerText = '编辑用户';
         userEmail.value = email;
-        userPassword.value = ''; // 密码留空，不修改
+        userPassword.value = ''; // 密码留空
         userModal.dataset.editId = id;
         userModal.classList.add('show');
     }
@@ -953,7 +971,7 @@
             const { error } = await sbClient.auth.signInWithPassword({ email, password });
             if (error) throw error;
         } catch (err) {
-            loginError.innerText = err.message; // 显示具体错误信息
+            loginError.innerText = err.message;
         }
     });
 
@@ -961,7 +979,7 @@
         await sbClient.auth.signOut();
     });
 
-    // ================== 数据管理事件绑定 ==================
+    // 数据管理事件绑定
     applyFilterBtn.addEventListener('click', applyFilter);
     resetFilterBtn.addEventListener('click', resetFilter);
     exportBtn.addEventListener('click', exportToXLSX);
