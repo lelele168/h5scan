@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>快递扫码系统 · 精致版</title>
+    <title>快递扫码系统 · 隔离版</title>
     <!-- QuaggaJS 扫码库 -->
     <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <!-- Supabase JS 客户端 -->
@@ -11,11 +11,7 @@
     <!-- SheetJS 用于导出 XLSX -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: #f8fafc;
@@ -25,17 +21,13 @@
             padding: 12px;
             color: #1e293b;
         }
-        .app {
-            max-width: 1200px;
-            width: 100%;
-        }
+        .app { max-width: 1200px; width: 100%; }
         .card {
             background: white;
             border-radius: 28px;
             padding: 24px 20px;
-            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.05), 0 0 0 1px rgba(0, 0, 0, 0.02);
+            box-shadow: 0 10px 30px -5px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.02);
             margin-bottom: 20px;
-            transition: box-shadow 0.2s;
         }
         .header-row {
             display: flex;
@@ -52,22 +44,9 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            letter-spacing: -0.02em;
         }
-        h2 {
-            font-size: 1.3rem;
-            font-weight: 500;
-            margin: 20px 0 16px;
-            color: #334155;
-        }
-        .tabs {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 12px;
-            flex-wrap: wrap;
-        }
+        h2 { font-size: 1.3rem; font-weight: 500; margin: 20px 0 16px; color: #334155; }
+        .tabs { display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; flex-wrap: wrap; }
         .tab-btn {
             background: none;
             border: none;
@@ -79,23 +58,9 @@
             transition: all 0.2s;
             font-weight: 500;
         }
-        .tab-btn.active {
-            background: #e0f2fe;
-            color: #0369a1;
-            font-weight: 600;
-        }
-        .auth-container {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            max-width: 400px;
-            margin: 40px auto;
-        }
-        .auth-form {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
+        .tab-btn.active { background: #e0f2fe; color: #0369a1; font-weight: 600; }
+        .auth-container { display: flex; flex-direction: column; gap: 20px; max-width: 400px; margin: 40px auto; }
+        .auth-form { display: flex; flex-direction: column; gap: 16px; }
         .auth-form input {
             padding: 16px 20px;
             border: 1px solid #e2e8f0;
@@ -105,10 +70,7 @@
             transition: all 0.2s;
             background: #f8fafc;
         }
-        .auth-form input:focus {
-            border-color: #0284c7;
-            box-shadow: 0 0 0 4px #bae6fd;
-        }
+        .auth-form input:focus { border-color: #0284c7; box-shadow: 0 0 0 4px #bae6fd; }
         .btn {
             padding: 14px 24px;
             border: none;
@@ -124,49 +86,17 @@
             justify-content: center;
             gap: 8px;
             white-space: nowrap;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
-        .btn-primary {
-            background: #0284c7;
-            color: white;
-            box-shadow: 0 4px 8px -2px rgba(2, 132, 199, 0.3);
-        }
-        .btn-primary:hover {
-            background: #0369a1;
-            transform: translateY(-1px);
-        }
-        .btn-success {
-            background: #10b981;
-            color: white;
-            box-shadow: 0 4px 8px -2px rgba(16, 185, 129, 0.3);
-        }
-        .btn-success:hover {
-            background: #059669;
-        }
-        .btn-warning {
-            background: #f59e0b;
-            color: white;
-        }
-        .btn-warning:hover {
-            background: #d97706;
-        }
-        .btn-danger {
-            background: #ef4444;
-            color: white;
-        }
-        .btn-danger:hover {
-            background: #dc2626;
-        }
-        .btn-sm {
-            padding: 8px 16px;
-            font-size: 0.9rem;
-        }
-        .flex-row {
-            display: flex;
-            gap: 12px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
+        .btn-primary { background: #0284c7; color: white; }
+        .btn-primary:hover { background: #0369a1; transform: translateY(-1px); }
+        .btn-success { background: #10b981; color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-sm { padding: 8px 16px; font-size: 0.9rem; }
+        .flex-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .user-header {
             display: flex;
             justify-content: space-between;
@@ -178,12 +108,7 @@
             padding: 12px 20px;
             border-radius: 60px;
         }
-        .status-bar {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
+        .status-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
         .sync-status {
             display: flex;
             align-items: center;
@@ -196,18 +121,10 @@
             font-weight: 500;
             transition: background 0.2s;
         }
-        .sync-status:hover {
-            background: #e2e8f0;
-        }
-        .sync-status.online {
-            color: #10b981;
-        }
-        .sync-status.offline {
-            color: #ef4444;
-        }
-        .sync-status.syncing {
-            color: #f59e0b;
-        }
+        .sync-status:hover { background: #e2e8f0; }
+        .sync-status.online { color: #10b981; }
+        .sync-status.offline { color: #ef4444; }
+        .sync-status.syncing { color: #f59e0b; }
         .sound-toggle {
             background: #f1f5f9;
             border: none;
@@ -220,22 +137,14 @@
             gap: 4px;
             transition: background 0.2s;
         }
-        .sound-toggle:hover {
-            background: #e2e8f0;
-        }
-        .sound-toggle.on {
-            color: #0284c7;
-        }
-        .sound-toggle.off {
-            color: #94a3b8;
-        }
+        .sound-toggle.on { color: #0284c7; }
+        .sound-toggle.off { color: #94a3b8; }
         .scanner-container {
             width: 100%;
             border-radius: 24px;
             overflow: hidden;
             background: #0f172a;
             margin: 20px 0;
-            position: relative;
             box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1);
         }
         #interactive.viewport {
@@ -249,20 +158,8 @@
             height: auto;
             display: block;
         }
-        .scanner-controls {
-            display: flex;
-            gap: 12px;
-            margin: 16px 0;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-        .manual-section {
-            display: flex;
-            gap: 12px;
-            margin: 20px 0;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
+        .scanner-controls { display: flex; gap: 12px; margin: 16px 0; justify-content: center; flex-wrap: wrap; }
+        .manual-section { display: flex; gap: 12px; margin: 20px 0; justify-content: center; flex-wrap: wrap; }
         .note-section {
             display: flex;
             gap: 12px;
@@ -300,29 +197,17 @@
             gap: 4px;
             transition: all 0.2s;
         }
-        .lock-toggle.locked {
-            color: #0284c7;
-            border-color: #0284c7;
-            background: #e0f2fe;
-        }
-        .lock-toggle.unlocked {
-            color: #94a3b8;
-        }
-        .lock-toggle:hover {
-            background: #f1f5f9;
-        }
+        .lock-toggle.locked { color: #0284c7; border-color: #0284c7; background: #e0f2fe; }
+        .lock-toggle.unlocked { color: #94a3b8; }
+        .lock-toggle:hover { background: #f1f5f9; }
         .result-card {
             background: #e0f2fe;
             padding: 20px;
             border-radius: 24px;
             margin: 20px 0;
             border-left: 6px solid #0284c7;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.02);
         }
-        .result-card.invalid {
-            border-left-color: #ef4444;
-            background: #fee2e2;
-        }
+        .result-card.invalid { border-left-color: #ef4444; background: #fee2e2; }
         .carrier-badge {
             background: #0284c7;
             color: white;
@@ -331,7 +216,6 @@
             font-size: 0.85rem;
             display: inline-block;
             font-weight: 600;
-            letter-spacing: 0.3px;
         }
         .pending-badge {
             background: #f59e0b;
@@ -341,7 +225,6 @@
             font-size: 0.7rem;
             margin-left: 6px;
             font-weight: 600;
-            text-transform: uppercase;
         }
         .stats-panel {
             background: #f8fafc;
@@ -354,49 +237,16 @@
             align-items: center;
             border: 1px solid #e2e8f0;
         }
-        .stat-item {
-            display: flex;
-            flex-direction: column;
-        }
-        .stat-label {
-            font-size: 0.85rem;
-            color: #64748b;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .stat-value {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: #0f172a;
-            line-height: 1.2;
-        }
-        .carrier-stats {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
+        .stat-item { display: flex; flex-direction: column; }
+        .stat-label { font-size: 0.85rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+        .stat-value { font-size: 1.8rem; font-weight: 700; color: #0f172a; line-height: 1.2; }
+        .carrier-stats { display: flex; flex-wrap: wrap; gap: 12px; }
         .carrier-stat {
             background: white;
             padding: 6px 16px;
             border-radius: 40px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+            border: 1px solid #e2e8f0;
             font-size: 0.9rem;
-            border: 1px solid #e2e8f0;
-        }
-        .search-box {
-            flex: 1 1 200px;
-            min-width: 180px;
-            padding: 12px 20px;
-            border: 1px solid #e2e8f0;
-            border-radius: 40px;
-            font-size: 1rem;
-            background: white;
-            transition: all 0.2s;
-        }
-        .search-box:focus {
-            border-color: #0284c7;
-            box-shadow: 0 0 0 3px #bae6fd;
-            outline: none;
         }
         .toolbar {
             display: flex;
@@ -408,19 +258,6 @@
             padding: 16px 20px;
             border-radius: 60px;
             border: 1px solid #e2e8f0;
-        }
-        .clear-select {
-            padding: 12px 20px;
-            border: 1px solid #e2e8f0;
-            border-radius: 40px;
-            font-size: 1rem;
-            background: white;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .clear-select:focus {
-            border-color: #0284c7;
-            outline: none;
         }
         .data-source-switch {
             display: flex;
@@ -469,12 +306,8 @@
             border-bottom: 1px solid #e2e8f0;
             background: white;
         }
-        tr:last-child td {
-            border-bottom: none;
-        }
-        tr:nth-child(even) td {
-            background: #fafafa;
-        }
+        tr:last-child td { border-bottom: none; }
+        tr:nth-child(even) td { background: #fafafa; }
         .delete-btn, .copy-btn {
             background: none;
             border: none;
@@ -484,38 +317,14 @@
             transition: 0.2s;
             border-radius: 30px;
         }
-        .copy-btn {
-            color: #0284c7;
-        }
-        .copy-btn:hover {
-            background: #e0f2fe;
-        }
-        .delete-btn {
-            color: #ef4444;
-        }
-        .delete-btn:hover {
-            background: #fee2e2;
-        }
-        .export-btn {
-            background: #0f172a;
-            color: white;
-            border: none;
-        }
-        .export-btn:hover {
-            background: #1e293b;
-        }
-        .footer-note {
-            text-align: center;
-            color: #94a3b8;
-            font-size: 0.85rem;
-            margin-top: 30px;
-            padding: 10px;
-        }
-        .error-msg {
-            color: #dc2626;
-            font-size: 0.9rem;
-            margin-top: 8px;
-        }
+        .copy-btn { color: #0284c7; }
+        .copy-btn:hover { background: #e0f2fe; }
+        .delete-btn { color: #ef4444; }
+        .delete-btn:hover { background: #fee2e2; }
+        .export-btn { background: #0f172a; color: white; }
+        .export-btn:hover { background: #1e293b; }
+        .footer-note { text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 30px; padding: 10px; }
+        .error-msg { color: #dc2626; font-size: 0.9rem; margin-top: 8px; }
         .badge {
             background: #ef4444;
             color: white;
@@ -541,18 +350,10 @@
             opacity: 0;
             pointer-events: none;
         }
-        .toast-message.show {
-            opacity: 1;
-        }
-        .toast-message.success {
-            background: #10b981;
-        }
-        .toast-message.error {
-            background: #ef4444;
-        }
-        .toast-message.warning {
-            background: #f59e0b;
-        }
+        .toast-message.show { opacity: 1; }
+        .toast-message.success { background: #10b981; }
+        .toast-message.error { background: #ef4444; }
+        .toast-message.warning { background: #f59e0b; }
         .scan-toast {
             position: fixed;
             top: 100px;
@@ -573,9 +374,7 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .scan-toast.show {
-            opacity: 1;
-        }
+        .scan-toast.show { opacity: 1; }
         .pagination {
             display: flex;
             gap: 8px;
@@ -594,18 +393,9 @@
             transition: background 0.2s;
             border: 1px solid #e2e8f0;
         }
-        .pagination button:hover:not(:disabled) {
-            background: #e2e8f0;
-        }
-        .pagination button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        .pagination span {
-            font-size: 1rem;
-            color: #475569;
-            font-weight: 500;
-        }
+        .pagination button:hover:not(:disabled) { background: #e2e8f0; }
+        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .pagination span { font-size: 1rem; color: #475569; font-weight: 500; }
         .modal {
             display: none;
             position: fixed;
@@ -620,9 +410,7 @@
             padding: 16px;
             backdrop-filter: blur(4px);
         }
-        .modal.show {
-            display: flex;
-        }
+        .modal.show { display: flex; }
         .modal-content {
             background: white;
             border-radius: 32px;
@@ -633,29 +421,18 @@
             overflow-y: auto;
             box-shadow: 0 20px 40px -10px rgba(0,0,0,0.3);
         }
-        .modal-content h3 {
-            margin-bottom: 24px;
-            font-size: 1.5rem;
-            font-weight: 600;
-        }
+        .modal-content h3 { margin-bottom: 24px; font-size: 1.5rem; font-weight: 600; }
         .modal-content input {
             width: 100%;
             padding: 16px 20px;
             border: 1px solid #e2e8f0;
             border-radius: 40px;
             font-size: 1rem;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             background: #f8fafc;
         }
-        .modal-buttons {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-        }
-        .test-sound {
-            margin: 12px 0;
-            text-align: center;
-        }
+        .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
+        .test-sound { margin: 12px 0; text-align: center; }
         .test-sound button {
             background: #f1f5f9;
             border: none;
@@ -667,17 +444,13 @@
             border: 1px solid #e2e8f0;
             transition: background 0.2s;
         }
-        .test-sound button:hover {
-            background: #e2e8f0;
-        }
+        .test-sound button:hover { background: #e2e8f0; }
         @media (max-width: 640px) {
             h1 { font-size: 1.5rem; }
             .btn { padding: 12px 18px; }
             .stats-panel { flex-direction: column; align-items: flex-start; gap: 16px; }
             .carrier-stats { width: 100%; }
             .toolbar { flex-direction: column; align-items: stretch; border-radius: 30px; }
-            .search-box { width: 100%; }
-            .clear-select { width: 100%; }
             .data-source-switch { justify-content: center; }
             .note-section { flex-direction: column; align-items: stretch; }
             .lock-toggle { align-self: flex-start; }
@@ -695,7 +468,7 @@
 <div class="app">
     <div class="card">
         <div class="header-row">
-            <h1>📦 快递扫码 · 精致版</h1>
+            <h1>📦 快递扫码 · 隔离版</h1>
             <div class="status-bar">
                 <button id="soundToggleBtn" class="sound-toggle on" title="声音提醒">🔊 声音</button>
                 <div id="syncStatus" class="sync-status online" title="点击立即同步">🟢 在线</div>
@@ -775,9 +548,9 @@
                 <div class="carrier-stats" id="carrierStats"></div>
             </div>
 
-            <!-- 工具栏：搜索 + 范围清空 + 导出 + 数据源切换 -->
+            <!-- 工具栏：搜索按钮 + 范围清空 + 导出 + 数据源切换 -->
             <div class="toolbar">
-                <input type="text" id="searchInput" class="search-box" placeholder="🔍 搜索单号或快递公司...">
+                <button id="searchBtn" class="btn btn-primary">🔍 搜索</button>
                 <select id="clearRangeSelect" class="clear-select">
                     <option value="session">本次扫码</option>
                     <option value="day">最近一天</option>
@@ -786,8 +559,9 @@
                 </select>
                 <button id="clearRangeBtn" class="btn btn-danger">🗑️ 清空所选范围</button>
                 <div class="data-source-switch">
-                    <button id="dataSourceAll" class="active">全部数据</button>
+                    <button id="dataSourceLocal" class="active">本地数据</button>
                     <button id="dataSourceCloud">云端数据</button>
+                    <button id="dataSourceAll">全部数据</button>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <button id="exportCsvBtn" class="btn export-btn">📥 CSV</button>
@@ -835,6 +609,21 @@
     </div>
 </div>
 
+<!-- 搜索模态框（支持扫码） -->
+<div id="searchModal" class="modal">
+    <div class="modal-content">
+        <h3>🔍 搜索记录</h3>
+        <input type="text" id="searchInput" placeholder="输入单号或快递公司" autocomplete="off">
+        <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+            <button id="scanSearchBtn" class="btn btn-success">📷 扫码搜索</button>
+        </div>
+        <div class="modal-buttons">
+            <button id="searchModalCancel" class="btn">取消</button>
+            <button id="searchModalConfirm" class="btn btn-primary">搜索</button>
+        </div>
+    </div>
+</div>
+
 <!-- 全局 Toast 提示 -->
 <div id="toast" class="toast-message"></div>
 <!-- 扫码单号临时显示 -->
@@ -864,9 +653,12 @@
     let isScanning = false;
     let lastScannedCode = '';
     let lastScanTime = 0;
-    let allRecords = [];
-    let cloudData = [];
+
+    // 所有记录（用于统计，但实际显示由数据源决定）
+    let allRecords = [];          // 本地待同步 + 云端已同步（合并后）
+    let cloudData = [];           // 纯云端数据
     let sessionStartTime = null;
+    let cloudDataLoaded = false;  // 云端数据是否已加载
 
     // 语音相关
     let speechEnabled = true;
@@ -884,8 +676,11 @@
     const pageSize = 10;
     let filteredRecords = [];
 
-    // 数据源模式：'all' 或 'cloud'
-    let dataSourceMode = 'all';
+    // 数据源模式：'local', 'cloud', 'all'
+    let dataSourceMode = 'local';
+
+    // 当前搜索关键词（在模态框中设置）
+    let searchKeyword = '';
 
     // DOM 元素
     const syncStatusDiv = document.getElementById('syncStatus');
@@ -917,7 +712,7 @@
     const exportXlsxBtn = document.getElementById('exportXlsxBtn');
     const startScanBtn = document.getElementById('startScanBtn');
     const pauseScanBtn = document.getElementById('pauseScanBtn');
-    const searchInput = document.getElementById('searchInput');
+    const searchBtn = document.getElementById('searchBtn');
     const clearRangeSelect = document.getElementById('clearRangeSelect');
     const clearRangeBtn = document.getElementById('clearRangeBtn');
     const totalCountSpan = document.getElementById('totalCount');
@@ -930,11 +725,17 @@
     const manualModalInput = document.getElementById('manualModalInput');
     const manualModalCancel = document.getElementById('manualModalCancel');
     const manualModalConfirm = document.getElementById('manualModalConfirm');
+    const searchModal = document.getElementById('searchModal');
+    const searchInput = document.getElementById('searchInput');
+    const scanSearchBtn = document.getElementById('scanSearchBtn');
+    const searchModalCancel = document.getElementById('searchModalCancel');
+    const searchModalConfirm = document.getElementById('searchModalConfirm');
     const prevPageBtn = document.getElementById('prevPageBtn');
     const nextPageBtn = document.getElementById('nextPageBtn');
     const pageInfo = document.getElementById('pageInfo');
-    const dataSourceAll = document.getElementById('dataSourceAll');
+    const dataSourceLocal = document.getElementById('dataSourceLocal');
     const dataSourceCloud = document.getElementById('dataSourceCloud');
+    const dataSourceAll = document.getElementById('dataSourceAll');
 
     // ================== 声音开关 ==================
     function loadSoundPreference() {
@@ -955,8 +756,6 @@
         saveSoundPreference();
         updateSoundButton();
         showToast(soundEnabled ? '声音提醒已开启' : '声音提醒已关闭', 'success');
-        console.log('声音开关:', soundEnabled ? '开启' : '关闭');
-        // 开启时播放语音，关闭时不播放（因为已静音）
         if (soundEnabled) {
             speak('声音已开启');
         }
@@ -1109,6 +908,70 @@
         if (e.target === manualModal) manualModal.classList.remove('show');
     });
 
+    // ================== 搜索模态框 ==================
+    searchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchModal.classList.add('show');
+        searchInput.focus();
+    });
+
+    searchModalCancel.addEventListener('click', () => {
+        searchModal.classList.remove('show');
+    });
+
+    searchModalConfirm.addEventListener('click', () => {
+        searchKeyword = searchInput.value.trim();
+        searchModal.classList.remove('show');
+        applyDataSource(); // 重新应用数据源和搜索
+    });
+
+    searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') searchModalConfirm.click();
+    });
+
+    // 扫码搜索
+    scanSearchBtn.addEventListener('click', () => {
+        // 复用扫码功能，但只填充搜索框，不保存记录
+        // 临时暂停主扫码流（如果正在运行）
+        const wasScanning = isScanning;
+        if (wasScanning) pauseScanner();
+
+        // 初始化一个临时扫码器
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.querySelector('#interactive'), // 复用视频容器，但会遮挡，可考虑显示提示
+                constraints: { width: 640, height: 480, facingMode: "environment" }
+            },
+            decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","code_39_reader","codabar_reader","upc_reader","i2of5_reader"] }
+        }, (err) => {
+            if (err) {
+                showToast('无法启动摄像头', 'error');
+                return;
+            }
+            Quagga.start();
+            showToast('请扫描条码', 'info');
+
+            // 单次检测
+            const onDetected = (result) => {
+                const code = result.codeResult.code;
+                if (code) {
+                    Quagga.stop();
+                    Quagga.offDetected(onDetected);
+                    searchInput.value = code;
+                    // 如果之前主扫码在运行，恢复
+                    if (wasScanning) startScanner();
+                }
+            };
+            Quagga.onDetected(onDetected);
+        });
+    });
+
+    searchModal.addEventListener('click', (e) => {
+        if (e.target === searchModal) searchModal.classList.remove('show');
+    });
+
     // ================== 本地存储 ==================
     const STORAGE_KEY = 'pending_scans';
 
@@ -1187,15 +1050,18 @@
         }
         savePendingToStorage();
         updateSyncStatusUI();
-        await loadMergedHistory();
-        // 同步完成后播放语音（如果原本有记录）
+        // 如果当前数据源涉及云端，重新加载云端数据
+        if (dataSourceMode !== 'local') {
+            await loadCloudData();
+        }
+        // 重新应用数据源
+        applyDataSource();
         speak('同步完成');
     }
 
-    // ================== 数据加载与合并 ==================
-    async function loadMergedHistory() {
+    // ================== 加载云端数据 ==================
+    async function loadCloudData() {
         if (!currentUser) return;
-        let cloudDataRaw = [];
         try {
             const { data, error } = await sbClient
                 .from('scans')
@@ -1203,17 +1069,54 @@
                 .eq('user_id', currentUser.id)
                 .order('scanned_at', { ascending: false });
             if (error) throw error;
-            cloudDataRaw = data || [];
+            cloudData = (data || []).map(item => ({ ...item, localId: null, pending: false }));
+            cloudDataLoaded = true;
         } catch (err) {
             console.error('加载云端数据失败:', err);
+            showToast('加载云端数据失败', 'error');
+        }
+    }
+
+    // ================== 更新显示 ==================
+    function applyDataSource() {
+        let baseRecords = [];
+        if (dataSourceMode === 'local') {
+            baseRecords = pendingRecords;
+        } else if (dataSourceMode === 'cloud') {
+            baseRecords = cloudDataLoaded ? cloudData : [];
+        } else { // all
+            // 合并 pendingRecords 和 cloudData，去重？按时间排序即可，可能有重复（pending中可能包含已同步但未删除的记录）
+            // 简单合并，按时间排序，待同步可能重复，但不影响显示
+            const combined = [...pendingRecords];
+            if (cloudDataLoaded) {
+                // 避免将 pending 中已同步的重复添加，但为了简单，我们合并并去重（用 localId 和 id 区分）
+                // 这里不去重，直接合并，可能会有重复但概率低
+                combined.push(...cloudData);
+            }
+            baseRecords = combined.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
         }
 
-        cloudData = cloudDataRaw.map(item => ({ ...item, localId: null, pending: false }));
-        allRecords = [...pendingRecords, ...cloudData];
-        allRecords.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+        // 应用搜索关键词
+        if (searchKeyword) {
+            const kw = searchKeyword.toLowerCase();
+            filteredRecords = baseRecords.filter(r =>
+                r.tracking_number.toLowerCase().includes(kw) ||
+                (r.carrier && r.carrier.toLowerCase().includes(kw))
+            );
+        } else {
+            filteredRecords = [...baseRecords];
+        }
 
+        // 更新统计（基于合并后的所有记录，便于显示总数）
+        allRecords = [...pendingRecords];
+        if (cloudDataLoaded) {
+            allRecords.push(...cloudData);
+        }
+        allRecords.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
         renderStats(allRecords);
-        applyDataSource();
+
+        currentPage = 1;
+        renderPage();
     }
 
     function renderStats(records) {
@@ -1228,31 +1131,6 @@
         carrierStatsDiv.innerHTML = Object.entries(carrierCount).map(([name, count]) =>
             `<span class="carrier-stat">${name}: ${count}</span>`
         ).join('');
-    }
-
-    function applyDataSource() {
-        let baseRecords = [];
-        if (dataSourceMode === 'all') {
-            baseRecords = allRecords;
-        } else {
-            baseRecords = cloudData;
-        }
-
-        const keyword = searchInput.value.trim().toLowerCase();
-        if (keyword) {
-            filteredRecords = baseRecords.filter(r =>
-                r.tracking_number.toLowerCase().includes(keyword) ||
-                (r.carrier && r.carrier.toLowerCase().includes(keyword))
-            );
-        } else {
-            filteredRecords = [...baseRecords];
-        }
-        currentPage = 1;
-        renderPage();
-    }
-
-    function applyFilter() {
-        applyDataSource();
     }
 
     function renderPage() {
@@ -1318,12 +1196,17 @@
         if (cloudId) {
             try {
                 await sbClient.from('scans').delete().eq('id', cloudId).eq('user_id', currentUser.id);
+                // 如果云端数据已加载，从中移除
+                if (cloudDataLoaded) {
+                    cloudData = cloudData.filter(r => r.id !== cloudId);
+                }
             } catch (err) {
                 showToast('删除失败', 'error');
                 return;
             }
         }
-        await loadMergedHistory();
+        // 重新应用数据源
+        applyDataSource();
         updateSyncStatusUI();
     }
 
@@ -1374,25 +1257,34 @@
             pendingRecords = [];
         }
         savePendingToStorage();
-        await loadMergedHistory();
+        // 如果云端数据已加载，重新加载
+        if (cloudDataLoaded) {
+            await loadCloudData();
+        }
+        applyDataSource();
         updateSyncStatusUI();
     }
 
     // ================== 数据源切换 ==================
     function setDataSource(mode) {
         dataSourceMode = mode;
-        if (mode === 'all') {
-            dataSourceAll.classList.add('active');
-            dataSourceCloud.classList.remove('active');
+        // 更新按钮状态
+        [dataSourceLocal, dataSourceCloud, dataSourceAll].forEach(btn => btn.classList.remove('active'));
+        if (mode === 'local') dataSourceLocal.classList.add('active');
+        else if (mode === 'cloud') dataSourceCloud.classList.add('active');
+        else dataSourceAll.classList.add('active');
+
+        // 如果切换到云端或全部且云端数据未加载，则加载
+        if ((mode === 'cloud' || mode === 'all') && !cloudDataLoaded) {
+            loadCloudData().then(() => applyDataSource());
         } else {
-            dataSourceCloud.classList.add('active');
-            dataSourceAll.classList.remove('active');
+            applyDataSource();
         }
-        applyDataSource();
     }
 
-    dataSourceAll.addEventListener('click', () => setDataSource('all'));
+    dataSourceLocal.addEventListener('click', () => setDataSource('local'));
     dataSourceCloud.addEventListener('click', () => setDataSource('cloud'));
+    dataSourceAll.addEventListener('click', () => setDataSource('all'));
 
     // ================== 辅助函数 ==================
     function escapeHtml(unsafe) {
@@ -1419,16 +1311,22 @@
         if (isOnline) {
             try {
                 await sbClient.from('scans').insert([{ ...record, user_id: currentUser.id }]);
-                await loadMergedHistory();
+                // 如果云端数据已加载，可以重新加载或直接加入cloudData
+                if (cloudDataLoaded) {
+                    // 重新加载云端数据保持最新
+                    await loadCloudData();
+                }
+                // 重新应用数据源
+                applyDataSource();
                 return true;
             } catch (err) {
                 addPendingRecord(record);
-                await loadMergedHistory();
+                applyDataSource();
                 return true;
             }
         } else {
             addPendingRecord(record);
-            await loadMergedHistory();
+            applyDataSource();
             return true;
         }
     }
@@ -1550,11 +1448,12 @@
         userInfoDiv.innerText = `👤 ${user.email}`;
         sessionStartTime = new Date();
         loadPendingFromStorage();
-        loadMergedHistory();
         updateSyncStatusUI();
         updateScanButtons();
         loadNoteOptions();
         noteLocked = false; lockedNote = ''; noteInput.value = ''; updateLockUI();
+        // 默认本地数据源，不加载云端
+        setDataSource('local');
     }
 
     sbClient.auth.onAuthStateChange((event, session) => {
@@ -1602,7 +1501,6 @@
 
     startScanBtn.addEventListener('click', startScanner);
     pauseScanBtn.addEventListener('click', pauseScanner);
-    searchInput.addEventListener('input', applyFilter);
     clearRangeBtn.addEventListener('click', clearRecordsByRange);
 
     prevPageBtn.addEventListener('click', () => {
@@ -1628,8 +1526,13 @@
 
     exportCsvBtn.addEventListener('click', async () => {
         if (!currentUser) return;
+        // 导出基于当前显示的 filteredRecords？还是全部？一般导出全部数据
         let cloudDataExport = [];
-        try { const { data } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id); cloudDataExport = data || []; } catch(e) {}
+        if (cloudDataLoaded) {
+            cloudDataExport = cloudData;
+        } else {
+            try { const { data } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id); cloudDataExport = data || []; } catch(e) {}
+        }
         const all = [...pendingRecords, ...cloudDataExport.map(d => ({ ...d, pending: false }))];
         all.sort((a,b) => new Date(b.scanned_at) - new Date(a.scanned_at));
         exportCSV(all);
@@ -1638,7 +1541,11 @@
     exportXlsxBtn.addEventListener('click', async () => {
         if (!currentUser) return;
         let cloudDataExport = [];
-        try { const { data } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id); cloudDataExport = data || []; } catch(e) {}
+        if (cloudDataLoaded) {
+            cloudDataExport = cloudData;
+        } else {
+            try { const { data } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id); cloudDataExport = data || []; } catch(e) {}
+        }
         const all = [...pendingRecords, ...cloudDataExport.map(d => ({ ...d, pending: false }))];
         all.sort((a,b) => new Date(b.scanned_at) - new Date(a.scanned_at));
         exportXLSX(all);
