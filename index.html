@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>快递扫码系统 · 融合版</title>
+    <title>快递扫码系统 · 分页版</title>
     <!-- QuaggaJS 扫码库 -->
     <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <!-- Supabase JS 客户端 -->
@@ -87,7 +87,12 @@
         .toast-message.warning { background: #f59e0b; }
         .scan-toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 12px 24px; border-radius: 40px; font-size: 1.2rem; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: opacity 0.3s; opacity: 0; pointer-events: none; white-space: nowrap; max-width: 80%; overflow: hidden; text-overflow: ellipsis; }
         .scan-toast.show { opacity: 1; }
-        /* 模态框样式 */
+        /* 分页控件 */
+        .pagination { display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 20px; flex-wrap: wrap; }
+        .pagination button { padding: 8px 16px; border: none; border-radius: 40px; background: #e2e8f0; cursor: pointer; }
+        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .pagination span { font-size: 0.95rem; color: #475569; }
+        /* 模态框 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 2000; }
         .modal.show { display: flex; }
         .modal-content { background: white; border-radius: 24px; padding: 24px; max-width: 400px; width: 90%; }
@@ -100,7 +105,7 @@
 <div class="app">
     <div class="card">
         <div class="header-row">
-            <h1>📦 快递扫码 · 融合版</h1>
+            <h1>📦 快递扫码 · 分页版</h1>
             <div class="status-bar">
                 <button id="soundToggleBtn" class="sound-toggle on" title="声音提醒">🔊</button>
                 <div id="syncStatus" class="sync-status online" title="点击立即同步">🟢 在线</div>
@@ -207,9 +212,16 @@
                 </table>
             </div>
             <p id="noDataMsg" style="color:#94a3b8; text-align:center; padding:30px;">暂无记录</p>
+
+            <!-- 分页控件 -->
+            <div class="pagination" id="pagination">
+                <button id="prevPageBtn" disabled>◀ 上一页</button>
+                <span id="pageInfo">第 1 页 / 共 1 页</span>
+                <button id="nextPageBtn" disabled>下一页 ▶</button>
+            </div>
         </div>
     </div>
-    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 备注融合</div>
+    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 每页15条</div>
 </div>
 
 <!-- 手动输入模态框 -->
@@ -267,6 +279,11 @@
     // 备注选项列表
     let noteOptions = [];
 
+    // 分页相关
+    let currentPage = 1;
+    const pageSize = 15;
+    let filteredRecords = [];  // 当前过滤后的记录
+
     // DOM 元素
     const syncStatusDiv = document.getElementById('syncStatus');
     const authArea = document.getElementById('authArea');
@@ -309,6 +326,9 @@
     const manualModalInput = document.getElementById('manualModalInput');
     const manualModalCancel = document.getElementById('manualModalCancel');
     const manualModalConfirm = document.getElementById('manualModalConfirm');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const pageInfo = document.getElementById('pageInfo');
 
     // ================== 声音开关 ==================
     function loadSoundPreference() {
@@ -340,40 +360,29 @@
     }
     soundToggleBtn.addEventListener('click', toggleSound);
 
-    // ================== 语音朗读（带蜂鸣备用）==================
+    // ================== 语音朗读（仅语音合成，无蜂鸣）==================
     function speak(text) {
-        if (!speechEnabled) return;
-        console.log('尝试朗读:', text);
-        if (window.speechSynthesis) {
-            // 取消任何正在进行的朗读
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'zh-CN';
-            utterance.rate = 0.9;
-            utterance.pitch = 1.2;
-            utterance.volume = 1;
-            // 尝试选择女性声音
-            const voices = window.speechSynthesis.getVoices();
-            const femaleVoice = voices.find(voice => voice.lang.includes('zh') && voice.name.includes('Female'));
-            if (femaleVoice) utterance.voice = femaleVoice;
-            window.speechSynthesis.speak(utterance);
-        } else {
-            // 降级：使用 Web Audio 播放蜂鸣
-            try {
-                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
-                osc.frequency.value = 800;
-                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
-                osc.start();
-                osc.stop(audioCtx.currentTime + 0.2);
-            } catch (e) {
-                console.warn('无法播放声音', e);
-            }
+        if (!speechEnabled) {
+            console.log('语音已关闭，不朗读');
+            return;
         }
+        if (!window.speechSynthesis) {
+            console.warn('浏览器不支持语音合成');
+            return;
+        }
+        // 取消任何正在进行的朗读，避免重叠
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 0.9;
+        utterance.pitch = 1.2;
+        utterance.volume = 1;
+        // 尝试选择女性声音
+        const voices = window.speechSynthesis.getVoices();
+        const femaleVoice = voices.find(voice => voice.lang.includes('zh') && voice.name.includes('Female'));
+        if (femaleVoice) utterance.voice = femaleVoice;
+        console.log('朗读:', text);
+        window.speechSynthesis.speak(utterance);
     }
 
     // ================== 震动 ==================
@@ -585,7 +594,7 @@
         allRecords = [...pendingRecords, ...cloudMapped];
         allRecords.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
         renderStats(allRecords);
-        applyFilter();
+        applyFilter(); // 应用过滤并更新分页
     }
 
     function renderStats(records) {
@@ -602,16 +611,38 @@
         ).join('');
     }
 
+    // 应用搜索过滤
     function applyFilter() {
         const keyword = searchInput.value.trim().toLowerCase();
-        let filtered = allRecords;
         if (keyword) {
-            filtered = allRecords.filter(r =>
+            filteredRecords = allRecords.filter(r =>
                 r.tracking_number.toLowerCase().includes(keyword) ||
                 (r.carrier && r.carrier.toLowerCase().includes(keyword))
             );
+        } else {
+            filteredRecords = [...allRecords];
         }
-        renderTable(filtered);
+        // 重置到第一页
+        currentPage = 1;
+        renderPage();
+    }
+
+    // 分页渲染
+    function renderPage() {
+        const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
+        if (currentPage < 1) currentPage = 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+
+        const start = (currentPage - 1) * pageSize;
+        const end = start + pageSize;
+        const pageRecords = filteredRecords.slice(start, end);
+
+        renderTable(pageRecords);
+
+        // 更新分页控件
+        pageInfo.innerText = `第 ${currentPage} 页 / 共 ${totalPages} 页`;
+        prevPageBtn.disabled = currentPage <= 1;
+        nextPageBtn.disabled = currentPage >= totalPages;
     }
 
     function renderTable(records) {
@@ -929,8 +960,25 @@
 
     startScanBtn.addEventListener('click', startScanner);
     pauseScanBtn.addEventListener('click', pauseScanner);
-    searchInput.addEventListener('input', applyFilter);
+    searchInput.addEventListener('input', () => {
+        applyFilter();
+    });
     clearRangeBtn.addEventListener('click', clearRecordsByRange);
+
+    // 分页事件
+    prevPageBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+            currentPage--;
+            renderPage();
+        }
+    });
+    nextPageBtn.addEventListener('click', () => {
+        const totalPages = Math.ceil(filteredRecords.length / pageSize);
+        if (currentPage < totalPages) {
+            currentPage++;
+            renderPage();
+        }
+    });
 
     syncStatusDiv.addEventListener('click', () => {
         if (isOnline && pendingRecords.length > 0) syncPendingRecords();
@@ -990,7 +1038,6 @@
     // 预加载语音列表
     if (window.speechSynthesis) {
         window.speechSynthesis.getVoices();
-        // 某些浏览器需要等待 voices 加载，但不需要额外操作
     }
 </script>
 </body>
