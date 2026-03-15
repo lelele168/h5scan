@@ -46,7 +46,8 @@
         .scanner-controls { display: flex; gap: 10px; margin: 10px 0; justify-content: center; }
         .manual-section { display: flex; gap: 10px; margin: 20px 0; }
         .manual-section input { flex: 1; padding: 14px 18px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; }
-        .result-card { background: #e6f7ff; padding: 16px; border-radius: 20px; margin: 20px 0; border-left: 6px solid #0284c7; }
+        .result-card { background: #e6f7ff; padding: 16px; border-radius: 20px; margin: 20px 0; border-left: 6px solid #0284c7; transition: all 0.3s; }
+        .result-card.invalid { border-left-color: #ef4444; background: #fee2e2; }
         .carrier-badge { background: #0284c7; color: white; padding: 4px 14px; border-radius: 40px; font-size: 0.85rem; display: inline-block; font-weight: 500; }
         .pending-badge { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 40px; font-size: 0.7rem; margin-left: 6px; }
         table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.95rem; }
@@ -71,6 +72,11 @@
         .error-msg { color: #dc2626; font-size: 0.9rem; margin-top: 8px; }
         .badge { background: #ef4444; color: white; border-radius: 20px; padding: 2px 8px; font-size: 0.7rem; margin-left: 6px; }
         .audio-tip { text-align: center; color: #0284c7; font-size: 0.8rem; margin-top: 8px; cursor: pointer; }
+        .toast-message { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 24px; border-radius: 40px; font-size: 1rem; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: opacity 0.3s; opacity: 0; pointer-events: none; }
+        .toast-message.show { opacity: 1; }
+        .toast-message.success { background: #10b981; }
+        .toast-message.error { background: #ef4444; }
+        .toast-message.warning { background: #f59e0b; }
     </style>
 </head>
 <body>
@@ -111,9 +117,10 @@
             <div class="scanner-container">
                 <div id="interactive" class="viewport"></div>
             </div>
+            <!-- 扫码控制：默认显示“开始扫码” -->
             <div class="scanner-controls">
-                <button id="pauseScanBtn" class="btn btn-warning">⏸️ 暂停扫码</button>
-                <button id="resumeScanBtn" class="btn btn-success" style="display: none;">▶️ 继续扫码</button>
+                <button id="startScanBtn" class="btn btn-success">▶️ 开始扫码</button>
+                <button id="stopScanBtn" class="btn btn-warning" style="display: none;">⏹️ 停止扫码</button>
             </div>
             <p class="hint">将快递单条码对准摄像头，或手动输入单号</p>
 
@@ -122,9 +129,9 @@
                 <button id="manualSubmit" class="btn btn-primary">登记</button>
             </div>
 
-            <!-- 最新扫描结果（增加重复提示行） -->
+            <!-- 最新扫描结果卡片（初始隐藏） -->
             <div id="currentResult" class="result-card" style="display: none;">
-                <h3>✅ 最新扫描</h3>
+                <h3>📌 最新扫描</h3>
                 <p><strong>单号：</strong> <span id="trackingNumber"></span></p>
                 <p><strong>快递公司：</strong> <span id="carrier"></span></p>
                 <p><strong>时间：</strong> <span id="scannedAt"></span></p>
@@ -175,8 +182,11 @@
             <div class="audio-tip" id="audioTip">🔊 点击页面任意位置以启用声音提示</div>
         </div>
     </div>
-    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 连续扫码 · 智能识别</div>
+    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 智能识别</div>
 </div>
+
+<!-- 全局 Toast 提示 -->
+<div id="toast" class="toast-message"></div>
 
 <script>
     // ================== 配置 ==================
@@ -184,6 +194,7 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu';
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+    // 快递公司识别规则（按优先级排列，无兜底规则）
     const carrierRules = [
         { name: '顺丰速运', regex: /^SF\d{12}$/i },
         { name: '圆通速递', regex: /^YT\d{10,12}$/i },
@@ -193,13 +204,15 @@
         { name: '京东物流', regex: /^JD\d{10,12}$/i },
         { name: '邮政EMS', regex: /^\d{13}$/ },
         { name: '极兔速递', regex: /^JT\d{10,12}$/i },
-        { name: '未知', regex: /.*/ }
+        { name: '百世快递', regex: /^BS\d{10,12}$/i },
+        { name: '天天快递', regex: /^TT\d{10,12}$/i },
+        { name: '德邦快递', regex: /^DP\d{10,12}$/i }
     ];
 
     let currentUser = null;
     let pendingRecords = [];
     let isOnline = navigator.onLine;
-    let isScanning = false;
+    let isScanning = false;          // 扫码是否运行
     let lastScannedCode = '';
     let lastScanTime = 0;
     let allRecords = [];
@@ -234,8 +247,8 @@
     const noDataMsg = document.getElementById('noDataMsg');
     const exportCsvBtn = document.getElementById('exportCsvBtn');
     const exportXlsxBtn = document.getElementById('exportXlsxBtn');
-    const pauseScanBtn = document.getElementById('pauseScanBtn');
-    const resumeScanBtn = document.getElementById('resumeScanBtn');
+    const startScanBtn = document.getElementById('startScanBtn');
+    const stopScanBtn = document.getElementById('stopScanBtn');
     const searchInput = document.getElementById('searchInput');
     const clearRangeSelect = document.getElementById('clearRangeSelect');
     const clearRangeBtn = document.getElementById('clearRangeBtn');
@@ -243,12 +256,12 @@
     const uniqueCountSpan = document.getElementById('uniqueCount');
     const carrierStatsDiv = document.getElementById('carrierStats');
     const audioTip = document.getElementById('audioTip');
+    const toast = document.getElementById('toast');
 
     // ================== 音频与震动 ==================
     function initAudio() {
         if (audioCtx) return;
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        // 页面任意点击激活音频
         const enableAudio = () => {
             if (audioCtx.state === 'suspended') {
                 audioCtx.resume().then(() => {
@@ -274,13 +287,13 @@
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         if (type === 'success') {
-            osc.frequency.value = 880; // A5
+            osc.frequency.value = 880;
             gain.gain.setValueAtTime(0.1, now);
             gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
             osc.start(now);
             osc.stop(now + 0.1);
         } else {
-            osc.frequency.value = 440; // A4
+            osc.frequency.value = 440;
             gain.gain.setValueAtTime(0.1, now);
             gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
             osc.start(now);
@@ -295,6 +308,15 @@
         } else {
             navigator.vibrate([100, 50, 100]);
         }
+    }
+
+    // 显示 Toast 消息
+    function showToast(message, type = 'success', duration = 2000) {
+        toast.className = `toast-message show ${type}`;
+        toast.textContent = message;
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, duration);
     }
 
     // ================== 本地存储 ==================
@@ -390,7 +412,7 @@
         updateSyncStatusUI();
         await loadMergedHistory();
         if (failedLocalIds.length > 0) {
-            alert(`部分记录同步失败，将在网络稳定后重试。`);
+            showToast('部分记录同步失败，将重试', 'error');
         }
     }
 
@@ -479,9 +501,9 @@
             btn.addEventListener('click', (e) => {
                 const code = e.target.dataset.code;
                 navigator.clipboard.writeText(code).then(() => {
-                    alert('单号已复制');
+                    showToast('单号已复制', 'success');
                 }).catch(() => {
-                    alert('复制失败');
+                    showToast('复制失败', 'error');
                 });
             });
         });
@@ -515,7 +537,7 @@
                 if (error) throw error;
             } catch (err) {
                 console.error('删除云端记录失败:', err);
-                alert('删除失败：' + err.message);
+                showToast('删除失败：' + err.message, 'error');
                 return;
             }
         }
@@ -528,7 +550,6 @@
     function findLastScanTime(trackingNumber) {
         const records = allRecords.filter(r => r.tracking_number === trackingNumber);
         if (records.length === 0) return null;
-        // 按时间倒序，取第一个（最新）
         records.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
         return new Date(records[0].scanned_at);
     }
@@ -541,7 +562,7 @@
 
         if (range === 'session') {
             if (!sessionStartTime) {
-                alert('无法确定本次登录时间，请重新登录。');
+                showToast('无法确定本次登录时间，请重新登录', 'error');
                 return;
             }
             startTime = sessionStartTime;
@@ -565,7 +586,7 @@
         }
 
         if (toDelete.length === 0) {
-            alert('所选范围内没有记录');
+            showToast('所选范围内没有记录', 'warning');
             return;
         }
 
@@ -586,7 +607,7 @@
                 if (error) throw error;
             } catch (err) {
                 console.error('批量删除云端失败:', err);
-                alert('删除云端记录失败：' + err.message);
+                showToast('删除云端记录失败：' + err.message, 'error');
                 return;
             }
         }
@@ -614,11 +635,12 @@
         });
     }
 
+    // 识别快递公司，返回公司名或 null（无效）
     function detectCarrier(trackingNumber) {
         for (let rule of carrierRules) {
             if (rule.regex.test(trackingNumber)) return rule.name;
         }
-        return '未知';
+        return null; // 无匹配则无效
     }
 
     async function saveScan(trackingNumber, carrier, notes = '') {
@@ -655,20 +677,23 @@
         }
     }
 
-    // 处理扫描/输入的单号（新增智能识别与重复提示）
+    // 处理扫描/输入的单号
     async function handleTrackingNumber(trackingNumber) {
         const carrier = detectCarrier(trackingNumber);
         
         // 无效条码处理
-        if (carrier === '未知') {
+        if (carrier === null) {
             playBeep('error');
             vibrate('error');
-            alert('❌ 无效的快递单号，请重新扫描');
+            showToast('❌ 无效的快递单号', 'error');
+            // 隐藏之前的结果卡片（可选）
+            currentResult.style.display = 'none';
             return;
         }
 
         // 查找上次扫描时间
         const lastTime = findLastScanTime(trackingNumber);
+        const isDuplicate = lastTime !== null;
         
         // 保存记录
         await saveScan(trackingNumber, carrier);
@@ -684,10 +709,12 @@
         scannedAtSpan.innerText = new Date().toLocaleString();
 
         // 显示重复提示
-        if (lastTime) {
+        if (isDuplicate) {
             duplicateHint.innerText = `⏰ 上次扫描：${lastTime.toLocaleString()}`;
+            showToast('📦 重复扫描，已保存', 'warning');
         } else {
             duplicateHint.innerText = '';
+            showToast('✅ 扫描成功', 'success');
         }
     }
 
@@ -707,27 +734,30 @@
         }, function(err) {
             if (err) {
                 console.error('扫码器初始化失败:', err);
-                alert('无法启动摄像头，请检查权限。你可以手动输入单号。');
+                showToast('无法启动摄像头，请检查权限', 'error');
                 return;
             }
+            // 初始化成功，但不自动启动
+            quaggaInitialized = true;
+        });
+    }
+
+    function startScanner() {
+        if (!quaggaInitialized) {
+            initScanner();
+            // 等待初始化完成再启动，简单起见延时启动
+            setTimeout(() => {
+                if (quaggaInitialized) {
+                    Quagga.start();
+                    isScanning = true;
+                    updateScanButtons();
+                }
+            }, 500);
+        } else {
             Quagga.start();
             isScanning = true;
-            quaggaInitialized = true;
             updateScanButtons();
-        });
-
-        Quagga.onDetected(function(result) {
-            if (!isScanning || !currentUser) return;
-            const code = result.codeResult.code;
-            if (!code) return;
-            const now = Date.now();
-            if (code === lastScannedCode && (now - lastScanTime) < 2000) {
-                return;
-            }
-            lastScannedCode = code;
-            lastScanTime = now;
-            handleTrackingNumber(code);
-        });
+        }
     }
 
     function stopScanner() {
@@ -738,21 +768,13 @@
         }
     }
 
-    function resumeScanner() {
-        if (quaggaInitialized && !isScanning) {
-            Quagga.start();
-            isScanning = true;
-            updateScanButtons();
-        }
-    }
-
     function updateScanButtons() {
         if (isScanning) {
-            pauseScanBtn.style.display = 'inline-block';
-            resumeScanBtn.style.display = 'none';
+            startScanBtn.style.display = 'none';
+            stopScanBtn.style.display = 'inline-block';
         } else {
-            pauseScanBtn.style.display = 'none';
-            resumeScanBtn.style.display = 'inline-block';
+            startScanBtn.style.display = 'inline-block';
+            stopScanBtn.style.display = 'none';
         }
     }
 
@@ -761,10 +783,9 @@
         authArea.style.display = 'block';
         mainApp.style.display = 'none';
         logoutBtn.style.display = 'none';
-        if (quaggaInitialized) {
+        if (quaggaInitialized && isScanning) {
             Quagga.stop();
             isScanning = false;
-            quaggaInitialized = false;
         }
     }
 
@@ -775,10 +796,12 @@
         userInfoDiv.innerText = `👤 ${user.email}`;
         sessionStartTime = new Date();
         loadPendingFromStorage();
-        initScanner();
+        initScanner();          // 初始化扫码，但不启动
         loadMergedHistory();
         updateSyncStatusUI();
-        initAudio(); // 初始化音频（但需用户点击才能播放）
+        initAudio();            // 初始化音频（需用户点击激活）
+        // 默认显示停止扫码按钮隐藏，开始扫码显示
+        updateScanButtons();
     }
 
     sbClient.auth.onAuthStateChange((event, session) => {
@@ -831,7 +854,7 @@
         try {
             const { error } = await sbClient.auth.signUp({ email, password });
             if (error) throw error;
-            alert('注册成功！请登录。');
+            showToast('注册成功！请登录', 'success');
             loginTab.click();
         } catch (err) {
             signupError.innerText = err.message;
@@ -845,7 +868,10 @@
 
     manualSubmit.addEventListener('click', () => {
         const val = manualInput.value.trim();
-        if (!val) return alert('请输入单号');
+        if (!val) {
+            showToast('请输入单号', 'warning');
+            return;
+        }
         handleTrackingNumber(val);
         manualInput.value = '';
     });
@@ -853,8 +879,8 @@
         if (e.key === 'Enter') manualSubmit.click();
     });
 
-    pauseScanBtn.addEventListener('click', stopScanner);
-    resumeScanBtn.addEventListener('click', resumeScanner);
+    startScanBtn.addEventListener('click', startScanner);
+    stopScanBtn.addEventListener('click', stopScanner);
 
     searchInput.addEventListener('input', applyFilter);
 
@@ -864,9 +890,9 @@
         if (isOnline && pendingRecords.length > 0) {
             syncPendingRecords();
         } else if (!isOnline) {
-            alert('当前处于离线状态，无法同步。请连接网络后重试。');
+            showToast('当前处于离线状态，无法同步', 'error');
         } else {
-            alert('所有记录已同步');
+            showToast('所有记录已同步', 'success');
         }
     });
 
@@ -902,7 +928,7 @@
 
     function exportCSV(records) {
         if (!records || records.length === 0) {
-            alert('暂无数据可导出');
+            showToast('暂无数据可导出', 'warning');
             return;
         }
         const headers = ['单号', '快递公司', '扫描时间', '备注', '状态'];
@@ -927,7 +953,7 @@
 
     function exportXLSX(records) {
         if (!records || records.length === 0) {
-            alert('暂无数据可导出');
+            showToast('暂无数据可导出', 'warning');
             return;
         }
         const data = records.map(row => ({
@@ -945,8 +971,7 @@
 
     // 初始化加载本地存储
     loadPendingFromStorage();
-    // 音频初始化（但不激活）
-    initAudio();
+    initAudio(); // 初始化音频上下文，但不激活
 </script>
 </body>
 </html>
