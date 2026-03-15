@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>快递扫码系统 · 高级版</title>
+    <title>快递扫码 · 集派风格</title>
     <!-- QuaggaJS 扫码库 -->
     <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <!-- Supabase JS 客户端 -->
@@ -14,7 +14,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background: #f8fafc;
+            background: #f5f7fa;
             min-height: 100vh;
             display: flex;
             justify-content: center;
@@ -24,9 +24,9 @@
         .app { max-width: 1200px; width: 100%; }
         .card {
             background: white;
-            border-radius: 28px;
-            padding: 24px 20px;
-            box-shadow: 0 10px 30px -5px rgba(0,0,0,0.05), 0 0 0 1px rgba(0,0,0,0.02);
+            border-radius: 32px;
+            padding: 28px 24px;
+            box-shadow: 0 20px 35px -8px rgba(0,0,0,0.1), 0 0 0 1px rgba(0,0,0,0.02);
             margin-bottom: 20px;
         }
         .header-row {
@@ -39,28 +39,63 @@
         }
         h1 {
             font-size: 1.8rem;
-            font-weight: 600;
+            font-weight: 700;
             color: #0f172a;
             display: flex;
             align-items: center;
             gap: 8px;
+            letter-spacing: -0.02em;
         }
-        h2 { font-size: 1.3rem; font-weight: 500; margin: 20px 0 16px; color: #334155; }
-        .tabs { display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; flex-wrap: wrap; }
+        h2 { font-size: 1.3rem; font-weight: 600; margin: 20px 0 16px; color: #334155; }
+        .auth-container {
+            max-width: 400px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 40px;
+            padding: 30px 24px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+        }
+        .auth-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 8px;
+            color: #0f172a;
+        }
+        .auth-subtitle {
+            text-align: center;
+            color: #64748b;
+            margin-bottom: 24px;
+            font-size: 0.95rem;
+        }
+        .tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 12px;
+            justify-content: center;
+        }
         .tab-btn {
             background: none;
             border: none;
-            padding: 8px 20px;
+            padding: 8px 24px;
             font-size: 1rem;
             border-radius: 40px;
             cursor: pointer;
             color: #64748b;
             transition: all 0.2s;
-            font-weight: 500;
+            font-weight: 600;
         }
-        .tab-btn.active { background: #e0f2fe; color: #0369a1; font-weight: 600; }
-        .auth-container { display: flex; flex-direction: column; gap: 20px; max-width: 400px; margin: 40px auto; }
-        .auth-form { display: flex; flex-direction: column; gap: 16px; }
+        .tab-btn.active {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
         .auth-form input {
             padding: 16px 20px;
             border: 1px solid #e2e8f0;
@@ -70,9 +105,12 @@
             transition: all 0.2s;
             background: #f8fafc;
         }
-        .auth-form input:focus { border-color: #0284c7; box-shadow: 0 0 0 4px #bae6fd; }
+        .auth-form input:focus {
+            border-color: #0284c7;
+            box-shadow: 0 0 0 4px #bae6fd;
+        }
         .btn {
-            padding: 14px 24px;
+            padding: 16px 24px;
             border: none;
             border-radius: 40px;
             font-size: 1rem;
@@ -87,8 +125,18 @@
             gap: 8px;
             white-space: nowrap;
         }
-        .btn-primary { background: #0284c7; color: white; }
+        .btn-primary {
+            background: #0284c7;
+            color: white;
+            box-shadow: 0 6px 14px -6px rgba(2,132,199,0.4);
+        }
         .btn-primary:hover { background: #0369a1; transform: translateY(-1px); }
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #334155;
+            border: 1px solid #cbd5e1;
+        }
+        .btn-secondary:hover { background: #e2e8f0; }
         .btn-success { background: #10b981; color: white; }
         .btn-success:hover { background: #059669; }
         .btn-warning { background: #f59e0b; color: white; }
@@ -96,6 +144,27 @@
         .btn-danger { background: #ef4444; color: white; }
         .btn-danger:hover { background: #dc2626; }
         .btn-sm { padding: 8px 16px; font-size: 0.9rem; }
+        .auth-footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        .auth-footer a {
+            color: #0284c7;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .local-mode-btn {
+            margin-top: 20px;
+            width: 100%;
+            background: white;
+            border: 1px dashed #94a3b8;
+            color: #475569;
+        }
+        .local-mode-btn:hover {
+            background: #f1f5f9;
+        }
         .flex-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .user-header {
             display: flex;
@@ -125,6 +194,16 @@
         .sync-status.online { color: #10b981; }
         .sync-status.offline { color: #ef4444; }
         .sync-status.syncing { color: #f59e0b; }
+        .local-mode-badge {
+            background: #f1f5f9;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
         .sound-toggle {
             background: #f1f5f9;
             border: none;
@@ -279,6 +358,10 @@
             background: #0284c7;
             color: white;
             border-color: #0284c7;
+        }
+        .data-source-switch button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
         table {
             width: 100%;
@@ -487,39 +570,52 @@
 <div class="app">
     <div class="card">
         <div class="header-row">
-            <h1>📦 快递扫码 · 高级版</h1>
+            <h1>📦 集派快递 · 扫码</h1>
             <div class="status-bar">
                 <button id="soundToggleBtn" class="sound-toggle on" title="声音提醒">🔊 声音</button>
-                <div id="syncStatus" class="sync-status online" title="点击立即同步">🟢 在线</div>
+                <div id="syncStatus" class="sync-status online" style="display: none;">🟢 在线</div>
+                <div id="localModeBadge" class="local-mode-badge" style="display: none;">📱 本地模式</div>
             </div>
         </div>
 
-        <div id="userHeader" class="user-header">
+        <div id="userHeader" class="user-header" style="display: none;">
             <div id="userInfo"></div>
-            <button id="logoutBtn" class="btn btn-sm" style="display: none;">退出登录</button>
+            <button id="logoutBtn" class="btn btn-sm">退出登录</button>
         </div>
 
-        <!-- 认证区域 -->
+        <!-- 认证区域（包含登录、注册、本地模式） -->
         <div id="authArea" class="auth-container">
+            <div class="auth-title">集派快递</div>
+            <div class="auth-subtitle">扫码录入快人一步</div>
             <div class="tabs">
                 <button id="loginTab" class="tab-btn active">登录</button>
                 <button id="signupTab" class="tab-btn">注册</button>
             </div>
             <div id="loginForm" class="auth-form">
-                <input type="email" id="loginEmail" placeholder="电子邮箱" required>
+                <input type="email" id="loginEmail" placeholder="邮箱" required>
                 <input type="password" id="loginPassword" placeholder="密码" required>
                 <button id="loginBtn" class="btn btn-primary">登录</button>
                 <div id="loginError" class="error-msg"></div>
             </div>
             <div id="signupForm" class="auth-form" style="display: none;">
-                <input type="email" id="signupEmail" placeholder="电子邮箱" required>
-                <input type="password" id="signupPassword" placeholder="密码（至少6位）" required>
+                <input type="text" id="signupUsername" placeholder="用户名（选填）">
+                <input type="email" id="signupEmail" placeholder="邮箱*" required>
+                <input type="password" id="signupPassword" placeholder="密码（至少6位）*" required>
+                <input type="password" id="signupConfirm" placeholder="确认密码*" required>
                 <button id="signupBtn" class="btn btn-primary">注册</button>
                 <div id="signupError" class="error-msg"></div>
             </div>
+            <div class="auth-footer">
+                <span id="switchToSignup">还没有账号？立即注册→</span>
+                <span id="switchToLogin" style="display: none;">已有账号？立即登录</span>
+            </div>
+            <button id="localModeBtn" class="btn btn-secondary local-mode-btn">📱 本地模式（无需登录）</button>
+            <div style="margin-top: 16px; font-size: 0.85rem; color: #94a3b8; text-align: center;">
+                提示：未注册用户可使用本地模式，但无法同步数据和使用后台管理功能
+            </div>
         </div>
 
-        <!-- 主应用区域 -->
+        <!-- 主应用区域（登录或本地模式后显示） -->
         <div id="mainApp" style="display: none;">
             <div class="scanner-container">
                 <div id="interactive" class="viewport"></div>
@@ -579,7 +675,7 @@
                 <button id="clearRangeBtn" class="btn btn-danger">🗑️ 清空所选范围</button>
                 <div class="data-source-switch">
                     <button id="dataSourceLocal" class="active">本地数据</button>
-                    <button id="dataSourceCloud">云端数据</button>
+                    <button id="dataSourceCloud" class="cloud-btn">云端数据</button>
                     <button id="dataSourceAll">全部数据</button>
                 </div>
                 <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -614,7 +710,7 @@
             </div>
         </div>
     </div>
-    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 每页10条</div>
+    <div class="footer-note">🔒 本地模式数据仅保存在当前设备 · 登录后可云端同步</div>
 </div>
 
 <!-- 手动输入模态框 -->
@@ -685,10 +781,14 @@
     let lastScannedCode = '';
     let lastScanTime = 0;
 
+    // 模式：normal（登录用户）或 local（本地模式）
+    let appMode = 'normal'; // 'normal' 或 'local'
+    let isLocalMode = false; // 辅助标志
+
     // 所有原始记录（用于分组）
     let allRecords = [];          // 本地待同步 + 云端已同步（合并后）
     let cloudData = [];           // 纯云端数据
-    let sessionStartTime = null;  // 本次登录时间
+    let sessionStartTime = null;  // 本次登录时间（仅用于正常模式）
     let cloudDataLoaded = false;  // 云端数据是否已加载
 
     // 语音相关
@@ -707,7 +807,7 @@
     const pageSize = 10;
     let groupedRecords = [];       // 分组后的记录（用于显示）
 
-    // 数据源模式：'local', 'cloud', 'all'
+    // 数据源模式：'local', 'cloud', 'all'（在本地模式下，cloud 无效）
     let dataSourceMode = 'local';
 
     // 当前搜索关键词
@@ -715,8 +815,10 @@
 
     // DOM 元素
     const syncStatusDiv = document.getElementById('syncStatus');
+    const localModeBadge = document.getElementById('localModeBadge');
     const authArea = document.getElementById('authArea');
     const mainApp = document.getElementById('mainApp');
+    const userHeader = document.getElementById('userHeader');
     const userInfoDiv = document.getElementById('userInfo');
     const logoutBtn = document.getElementById('logoutBtn');
     const loginTab = document.getElementById('loginTab');
@@ -727,6 +829,9 @@
     const signupBtn = document.getElementById('signupBtn');
     const loginError = document.getElementById('loginError');
     const signupError = document.getElementById('signupError');
+    const switchToSignup = document.getElementById('switchToSignup');
+    const switchToLogin = document.getElementById('switchToLogin');
+    const localModeBtn = document.getElementById('localModeBtn');
     const manualBtn = document.getElementById('manualBtn');
     const noteInput = document.getElementById('noteInput');
     const noteOptionsDatalist = document.getElementById('noteOptionsDatalist');
@@ -772,6 +877,18 @@
     const dataSourceCloud = document.getElementById('dataSourceCloud');
     const dataSourceAll = document.getElementById('dataSourceAll');
 
+    // ================== 辅助函数 ==================
+    function escapeHtml(unsafe) {
+        return unsafe.replace(/[&<>"']/g, m => {
+            if(m === '&') return '&amp;';
+            if(m === '<') return '&lt;';
+            if(m === '>') return '&gt;';
+            if(m === '"') return '&quot;';
+            if(m === "'") return '&#039;';
+            return m;
+        });
+    }
+
     // ================== 声音开关 ==================
     function loadSoundPreference() {
         const saved = localStorage.getItem('soundEnabled');
@@ -780,7 +897,6 @@
         }
         speechEnabled = soundEnabled;
         updateSoundButton();
-        console.log('声音偏好加载:', soundEnabled ? '开启' : '关闭');
     }
     function saveSoundPreference() {
         localStorage.setItem('soundEnabled', soundEnabled);
@@ -826,15 +942,14 @@
         const voices = window.speechSynthesis.getVoices();
         const femaleVoice = voices.find(voice => voice.lang.includes('zh') && voice.name.includes('Female'));
         if (femaleVoice) utterance.voice = femaleVoice;
-        console.log('朗读内容:', text, '使用声音:', femaleVoice ? femaleVoice.name : '默认');
-        utterance.onend = () => console.log('朗读结束');
+        console.log('朗读内容:', text);
         utterance.onerror = (e) => console.error('朗读错误', e);
         window.speechSynthesis.speak(utterance);
     }
 
     testSoundBtn.addEventListener('click', () => {
         speak('测试声音');
-        showToast('测试声音已播放，请听是否有声音', 'info');
+        showToast('测试声音已播放', 'info');
     });
 
     // ================== 震动 ==================
@@ -957,7 +1072,7 @@
     searchModalConfirm.addEventListener('click', () => {
         searchKeyword = searchInput.value.trim();
         searchModal.classList.remove('show');
-        applyDataSource(); // 重新应用数据源和搜索
+        applyDataSource();
     });
 
     searchInput.addEventListener('keypress', (e) => {
@@ -966,11 +1081,9 @@
 
     // 扫码搜索
     scanSearchBtn.addEventListener('click', () => {
-        // 临时暂停主扫码流（如果正在运行）
         const wasScanning = isScanning;
         if (wasScanning) pauseScanner();
 
-        // 初始化一个临时扫码器
         Quagga.init({
             inputStream: {
                 name: "Live",
@@ -1025,7 +1138,6 @@
             detailList.appendChild(div);
         });
 
-        // 绑定详情内的复制和删除事件
         detailList.querySelectorAll('.copy-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const code = e.target.dataset.code;
@@ -1039,7 +1151,6 @@
                 const cloudId = e.target.dataset.cloudid;
                 if (confirm('确定删除这条记录？')) {
                     await deleteRecord(localId, cloudId);
-                    // 刷新详情模态框？关闭后重新打开会刷新
                     detailModal.classList.remove('show');
                 }
             });
@@ -1085,8 +1196,16 @@
         return newRecord;
     }
 
-    // ================== 同步状态 ==================
+    // ================== 同步状态 UI ==================
     function updateSyncStatusUI() {
+        if (isLocalMode) {
+            syncStatusDiv.style.display = 'none';
+            localModeBadge.style.display = 'flex';
+            return;
+        }
+        syncStatusDiv.style.display = 'flex';
+        localModeBadge.style.display = 'none';
+
         if (!isOnline) {
             syncStatusDiv.className = 'sync-status offline';
             syncStatusDiv.innerHTML = `🔴 离线 <span class="badge">${pendingRecords.length}</span>`;
@@ -1104,7 +1223,7 @@
     window.addEventListener('online', () => {
         isOnline = true;
         updateSyncStatusUI();
-        syncPendingRecords();
+        if (!isLocalMode && currentUser) syncPendingRecords();
     });
     window.addEventListener('offline', () => {
         isOnline = false;
@@ -1112,7 +1231,7 @@
     });
 
     async function syncPendingRecords() {
-        if (!isOnline || !currentUser || pendingRecords.length === 0) return;
+        if (isLocalMode || !currentUser || !isOnline || pendingRecords.length === 0) return;
         syncStatusDiv.className = 'sync-status syncing';
         syncStatusDiv.innerHTML = `🟡 同步中...`;
 
@@ -1143,7 +1262,7 @@
 
     // ================== 加载云端数据 ==================
     async function loadCloudData() {
-        if (!currentUser) return;
+        if (isLocalMode || !currentUser) return;
         try {
             const { data, error } = await sbClient
                 .from('scans')
@@ -1175,13 +1294,12 @@
                 };
             }
             groups[num].records.push(rec);
-            // 更新首次和最新时间
             if (new Date(rec.scanned_at) < new Date(groups[num].first_time)) {
                 groups[num].first_time = rec.scanned_at;
             }
             if (new Date(rec.scanned_at) > new Date(groups[num].last_time)) {
                 groups[num].last_time = rec.scanned_at;
-                groups[num].carrier = rec.carrier; // 取最新的公司
+                groups[num].carrier = rec.carrier;
             }
             groups[num].count++;
         });
@@ -1192,36 +1310,54 @@
     function applyDataSource() {
         let baseRecords = [];
 
-        // 构建原始数据池（pending + cloud）
-        const combined = [...pendingRecords];
-        if (cloudDataLoaded) {
-            combined.push(...cloudData);
-        }
-
-        if (dataSourceMode === 'local') {
-            // 本地数据：本次登录后扫描的所有记录（包括已同步的）
-            baseRecords = combined.filter(r => new Date(r.scanned_at) >= sessionStartTime);
-        } else if (dataSourceMode === 'cloud') {
-            baseRecords = cloudDataLoaded ? [...cloudData] : [];
-        } else { // all
+        // 构建原始数据池（pending + cloud），但在本地模式下只有 pending
+        if (isLocalMode) {
+            baseRecords = [...pendingRecords];
+        } else {
+            const combined = [...pendingRecords];
+            if (cloudDataLoaded) combined.push(...cloudData);
             baseRecords = combined;
         }
 
+        if (dataSourceMode === 'local') {
+            if (isLocalMode) {
+                // 本地模式没有登录，所有记录都是本地
+                // 但我们可以按时间过滤？本地模式不区分 session
+                baseRecords = pendingRecords;
+            } else {
+                // 正常模式：本地数据指本次登录后的记录
+                baseRecords = baseRecords.filter(r => new Date(r.scanned_at) >= sessionStartTime);
+            }
+        } else if (dataSourceMode === 'cloud') {
+            if (isLocalMode || !cloudDataLoaded) {
+                baseRecords = [];
+            } else {
+                baseRecords = [...cloudData];
+            }
+        } else { // all
+            // 全部数据 = 合并后的所有
+            if (isLocalMode) {
+                baseRecords = pendingRecords;
+            } else {
+                baseRecords = [...pendingRecords];
+                if (cloudDataLoaded) baseRecords.push(...cloudData);
+            }
+        }
+
         // 应用搜索关键词
-        let filteredBase = baseRecords;
         if (searchKeyword) {
             const kw = searchKeyword.toLowerCase();
-            filteredBase = baseRecords.filter(r =>
+            baseRecords = baseRecords.filter(r =>
                 r.tracking_number.toLowerCase().includes(kw) ||
                 (r.carrier && r.carrier.toLowerCase().includes(kw))
             );
         }
 
         // 分组
-        groupedRecords = groupRecords(filteredBase);
+        groupedRecords = groupRecords(baseRecords);
 
-        // 更新统计（基于所有原始记录，不受搜索影响？我们基于当前数据源的原始记录）
-        allRecords = baseRecords; // 用于统计
+        // 更新统计（基于当前显示的原始记录？我们用 baseRecords 统计）
+        allRecords = baseRecords;
         renderStats(allRecords);
 
         currentPage = 1;
@@ -1281,29 +1417,23 @@
             </tr>
         `}).join('');
 
-        // 绑定详情按钮
         document.querySelectorAll('.detail-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const number = e.target.dataset.number;
                 const group = groupedRecords.find(g => g.tracking_number === number);
-                if (group) {
-                    showDetailModal(number, group.records);
-                }
+                if (group) showDetailModal(number, group.records);
             });
         });
 
-        // 绑定删除全部按钮
         document.querySelectorAll('.delete-btn[data-number]').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const number = e.target.dataset.number;
                 if (confirm(`确定删除单号 ${number} 的所有记录吗？`)) {
                     const group = groupedRecords.find(g => g.tracking_number === number);
                     if (group) {
-                        // 删除所有记录
                         for (const rec of group.records) {
                             await deleteRecord(rec.localId, rec.id);
                         }
-                        // 重新应用数据源
                         applyDataSource();
                         updateSyncStatusUI();
                     }
@@ -1313,12 +1443,11 @@
     }
 
     async function deleteRecord(localId, cloudId) {
-        if (!currentUser) return false;
         if (localId) {
             pendingRecords = pendingRecords.filter(r => r.localId !== localId);
             savePendingToStorage();
         }
-        if (cloudId) {
+        if (!isLocalMode && cloudId) {
             try {
                 await sbClient.from('scans').delete().eq('id', cloudId).eq('user_id', currentUser.id);
                 if (cloudDataLoaded) {
@@ -1344,6 +1473,10 @@
         const range = clearRangeSelect.value;
         let startTime = null, rangeDesc = '';
         if (range === 'session') {
+            if (isLocalMode) {
+                showToast('本地模式无法按本次登录删除', 'warning');
+                return;
+            }
             if (!sessionStartTime) { showToast('无法确定本次登录时间', 'error'); return; }
             startTime = sessionStartTime;
             rangeDesc = '本次扫码';
@@ -1363,7 +1496,7 @@
         if (toDeleteRecords.length === 0) { showToast('所选范围内没有记录', 'warning'); return; }
         if (!confirm(`确定删除 ${rangeDesc} 的 ${toDeleteRecords.length} 条记录吗？`)) return;
 
-        if (isOnline && currentUser) {
+        if (!isLocalMode && isOnline && currentUser) {
             try {
                 let query = sbClient.from('scans').delete().eq('user_id', currentUser.id);
                 if (startTime) query = query.gte('scanned_at', startTime.toISOString());
@@ -1380,7 +1513,7 @@
             pendingRecords = [];
         }
         savePendingToStorage();
-        if (cloudDataLoaded) {
+        if (!isLocalMode && cloudDataLoaded) {
             await loadCloudData();
         }
         applyDataSource();
@@ -1391,11 +1524,22 @@
     function setDataSource(mode) {
         dataSourceMode = mode;
         [dataSourceLocal, dataSourceCloud, dataSourceAll].forEach(btn => btn.classList.remove('active'));
-        if (mode === 'local') dataSourceLocal.classList.add('active');
-        else if (mode === 'cloud') dataSourceCloud.classList.add('active');
-        else dataSourceAll.classList.add('active');
 
-        if ((mode === 'cloud' || mode === 'all') && !cloudDataLoaded) {
+        if (mode === 'local') {
+            dataSourceLocal.classList.add('active');
+        } else if (mode === 'cloud') {
+            if (isLocalMode) {
+                showToast('本地模式不可用云端数据', 'warning');
+                dataSourceLocal.classList.add('active');
+                dataSourceMode = 'local';
+                return;
+            }
+            dataSourceCloud.classList.add('active');
+        } else {
+            dataSourceAll.classList.add('active');
+        }
+
+        if (!isLocalMode && (mode === 'cloud' || mode === 'all') && !cloudDataLoaded) {
             loadCloudData().then(() => applyDataSource());
         } else {
             applyDataSource();
@@ -1408,14 +1552,14 @@
 
     // ================== 限制检查 ==================
     async function checkLimits(trackingNumber) {
-        // 本地检查：同一设备上该单号待同步数量
+        // 本地检查
         const localCount = pendingRecords.filter(r => r.tracking_number === trackingNumber).length;
         if (localCount >= 3) {
             return { allowed: false, reason: '本设备上该单号已扫描3次' };
         }
 
-        if (!isOnline) {
-            // 离线时无法检查云端，只检查本地
+        if (isLocalMode || !isOnline || !currentUser) {
+            // 本地模式或离线时只检查本地
             return { allowed: true };
         }
 
@@ -1425,7 +1569,6 @@
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
         try {
-            // 当天数量
             const { count: dayCount, error: dayError } = await sbClient
                 .from('scans')
                 .select('*', { count: 'exact', head: true })
@@ -1434,7 +1577,6 @@
                 .gte('scanned_at', startOfDay);
             if (dayError) throw dayError;
 
-            // 当月数量
             const { count: monthCount, error: monthError } = await sbClient
                 .from('scans')
                 .select('*', { count: 'exact', head: true })
@@ -1443,59 +1585,13 @@
                 .gte('scanned_at', startOfMonth);
             if (monthError) throw monthError;
 
-            if (dayCount >= 6) {
-                return { allowed: false, reason: '当天该单号已扫描6次' };
-            }
-            if (monthCount >= 10) {
-                return { allowed: false, reason: '当月该单号已扫描10次' };
-            }
+            if (dayCount >= 6) return { allowed: false, reason: '当天该单号已扫描6次' };
+            if (monthCount >= 10) return { allowed: false, reason: '当月该单号已扫描10次' };
             return { allowed: true };
         } catch (err) {
             console.error('检查限制失败', err);
             showToast('检查扫描限制失败', 'error');
             return { allowed: false, reason: '检查失败' };
-        }
-    }
-
-    // ================== 辅助函数 ==================
-    function escapeHtml(unsafe) {
-        return unsafe.replace(/[&<>"']/g, m => {
-            if(m === '&') return '&amp;';
-            if(m === '<') return '&lt;';
-            if(m === '>') return '&gt;';
-            if(m === '"') return '&quot;';
-            if(m === "'") return '&#039;';
-            return m;
-        });
-    }
-
-    function detectCarrier(trackingNumber) {
-        for (let rule of carrierRules) {
-            if (rule.regex.test(trackingNumber)) return rule.name;
-        }
-        return null;
-    }
-
-    async function saveScan(trackingNumber, carrier, notes = '') {
-        if (!currentUser) return false;
-        const record = { tracking_number: trackingNumber, carrier, notes, scanned_at: new Date().toISOString() };
-        if (isOnline) {
-            try {
-                await sbClient.from('scans').insert([{ ...record, user_id: currentUser.id }]);
-                if (cloudDataLoaded) {
-                    await loadCloudData(); // 重新加载云端数据
-                }
-                applyDataSource();
-                return true;
-            } catch (err) {
-                addPendingRecord(record);
-                applyDataSource();
-                return true;
-            }
-        } else {
-            addPendingRecord(record);
-            applyDataSource();
-            return true;
         }
     }
 
@@ -1520,10 +1616,8 @@
             return;
         }
 
-        // 检查限制
         const limitCheck = await checkLimits(trackingNumber);
         if (!limitCheck.allowed) {
-            // 弹窗提醒，让用户选择是否继续
             const userConfirm = confirm(`⚠️ 限制提醒：${limitCheck.reason}。是否仍然保存？`);
             if (!userConfirm) {
                 speak('已取消');
@@ -1536,7 +1630,18 @@
         const lastTime = findLastScanTime(trackingNumber);
         const isDuplicate = lastTime !== null;
 
-        await saveScan(trackingNumber, carrier, note);
+        const record = { tracking_number: trackingNumber, carrier, notes: note, scanned_at: new Date().toISOString() };
+        if (!isLocalMode && isOnline && currentUser) {
+            try {
+                await sbClient.from('scans').insert([{ ...record, user_id: currentUser.id }]);
+                if (cloudDataLoaded) await loadCloudData();
+            } catch (err) {
+                addPendingRecord(record);
+            }
+        } else {
+            addPendingRecord(record);
+        }
+        applyDataSource();
 
         if (isDuplicate) { speak('重复'); vibrate('repeat'); } else { speak('成功'); vibrate('success'); }
 
@@ -1547,6 +1652,13 @@
         scannedAtSpan.innerText = new Date().toLocaleString();
         duplicateHint.innerText = isDuplicate ? `⏰ 上次扫描：${lastTime.toLocaleString()}` : '';
         showToast(isDuplicate ? '重复扫描，已保存' : '扫描成功', isDuplicate ? 'warning' : 'success');
+    }
+
+    function detectCarrier(trackingNumber) {
+        for (let rule of carrierRules) {
+            if (rule.regex.test(trackingNumber)) return rule.name;
+        }
+        return null;
     }
 
     // ================== 扫码初始化 ==================
@@ -1576,7 +1688,7 @@
     }
 
     function startScanner() {
-        if (!currentUser) return;
+        if (!currentUser && !isLocalMode) return;
         try { Quagga.stop(); } catch(e) {}
         quaggaInitialized = false; quaggaInitPending = false;
         initScanner(success => {
@@ -1608,7 +1720,7 @@
     }
 
     Quagga.onDetected(result => {
-        if (!isScanning || !currentUser) return;
+        if (!isScanning || (!currentUser && !isLocalMode)) return;
         const code = result.codeResult.code;
         if (code) handleTrackingNumber(code);
     });
@@ -1617,42 +1729,116 @@
     function showAuth() {
         authArea.style.display = 'block';
         mainApp.style.display = 'none';
-        logoutBtn.style.display = 'none';
+        userHeader.style.display = 'none';
         if (quaggaInitialized && isScanning) Quagga.stop();
     }
 
-    function showApp(user) {
+    function showApp() {
         authArea.style.display = 'none';
         mainApp.style.display = 'block';
-        logoutBtn.style.display = 'inline-block';
-        userInfoDiv.innerText = `👤 ${user.email}`;
-        sessionStartTime = new Date(); // 记录本次登录时间
-        loadPendingFromStorage();
+        userHeader.style.display = 'flex';
         updateSyncStatusUI();
+
+        // 根据模式禁用/启用云端相关按钮
+        if (isLocalMode) {
+            dataSourceCloud.disabled = true;
+            syncStatusDiv.style.display = 'none';
+            localModeBadge.style.display = 'flex';
+        } else {
+            dataSourceCloud.disabled = false;
+            syncStatusDiv.style.display = 'flex';
+            localModeBadge.style.display = 'none';
+        }
+
+        loadPendingFromStorage();
         updateScanButtons();
         loadNoteOptions();
         noteLocked = false; lockedNote = ''; noteInput.value = ''; updateLockUI();
-        setDataSource('local'); // 默认本地数据
+
+        if (isLocalMode) {
+            // 本地模式，不加载云端
+            cloudDataLoaded = false;
+            cloudData = [];
+            applyDataSource();
+        } else {
+            // 正常模式，可能需要加载云端
+            setDataSource('local'); // 默认本地数据（本次登录）
+        }
     }
 
+    // 登录成功
+    async function handleLoginSuccess(user) {
+        currentUser = user;
+        isLocalMode = false;
+        appMode = 'normal';
+        sessionStartTime = new Date();
+        userInfoDiv.innerText = `👤 ${user.email}`;
+        showApp();
+        // 预加载云端数据（但不自动切换）
+        loadCloudData();
+    }
+
+    // 本地模式
+    function enterLocalMode() {
+        currentUser = null;
+        isLocalMode = true;
+        appMode = 'local';
+        sessionStartTime = null;
+        userInfoDiv.innerText = '📱 本地模式';
+        showApp();
+    }
+
+    // 退出登录
+    logoutBtn.addEventListener('click', async () => {
+        if (!isLocalMode) {
+            pauseScanner();
+            await sbClient.auth.signOut();
+        }
+        // 本地模式直接退出到登录页
+        currentUser = null;
+        isLocalMode = false;
+        showAuth();
+    });
+
+    // 监听认证状态（正常模式）
     sbClient.auth.onAuthStateChange((event, session) => {
-        if (session) { currentUser = session.user; showApp(currentUser); }
-        else { currentUser = null; showAuth(); }
+        if (session && !isLocalMode) {
+            currentUser = session.user;
+            handleLoginSuccess(currentUser);
+        } else if (!session && !isLocalMode) {
+            currentUser = null;
+            showAuth();
+        }
     });
 
     sbClient.auth.getSession().then(({ data: { session } }) => {
-        if (session) { currentUser = session.user; showApp(currentUser); }
+        if (session) {
+            currentUser = session.user;
+            handleLoginSuccess(currentUser);
+        } else {
+            showAuth();
+        }
     });
 
-    // ================== 事件绑定 ==================
+    // ================== 登录/注册 UI 逻辑 ==================
     loginTab.addEventListener('click', () => {
-        loginTab.classList.add('active'); signupTab.classList.remove('active');
-        loginForm.style.display = 'flex'; signupForm.style.display = 'none';
+        loginTab.classList.add('active');
+        signupTab.classList.remove('active');
+        loginForm.style.display = 'flex';
+        signupForm.style.display = 'none';
+        switchToSignup.style.display = 'inline';
+        switchToLogin.style.display = 'none';
     });
     signupTab.addEventListener('click', () => {
-        signupTab.classList.add('active'); loginTab.classList.remove('active');
-        signupForm.style.display = 'flex'; loginForm.style.display = 'none';
+        signupTab.classList.add('active');
+        loginTab.classList.remove('active');
+        signupForm.style.display = 'flex';
+        loginForm.style.display = 'none';
+        switchToLogin.style.display = 'inline';
+        switchToSignup.style.display = 'none';
     });
+    switchToSignup.addEventListener('click', () => signupTab.click());
+    switchToLogin.addEventListener('click', () => loginTab.click());
 
     loginBtn.addEventListener('click', async () => {
         const email = document.getElementById('loginEmail').value.trim();
@@ -1667,6 +1853,11 @@
     signupBtn.addEventListener('click', async () => {
         const email = document.getElementById('signupEmail').value.trim();
         const password = document.getElementById('signupPassword').value;
+        const confirm = document.getElementById('signupConfirm').value;
+        if (password !== confirm) {
+            signupError.innerText = '两次密码不一致';
+            return;
+        }
         signupError.innerText = '';
         try {
             const { error } = await sbClient.auth.signUp({ email, password });
@@ -1676,8 +1867,11 @@
         } catch (err) { signupError.innerText = err.message; }
     });
 
-    logoutBtn.addEventListener('click', async () => { pauseScanner(); await sbClient.auth.signOut(); });
+    localModeBtn.addEventListener('click', () => {
+        enterLocalMode();
+    });
 
+    // ================== 其他事件绑定 ==================
     startScanBtn.addEventListener('click', startScanner);
     pauseScanBtn.addEventListener('click', pauseScanner);
     clearRangeBtn.addEventListener('click', clearRecordsByRange);
@@ -1691,6 +1885,7 @@
     });
 
     syncStatusDiv.addEventListener('click', () => {
+        if (isLocalMode) return;
         if (isOnline && pendingRecords.length > 0) {
             speak('开始同步');
             syncPendingRecords();
@@ -1704,33 +1899,8 @@
     });
 
     exportCsvBtn.addEventListener('click', async () => {
-        if (!currentUser) return;
-        let cloudDataExport = [];
-        if (cloudDataLoaded) {
-            cloudDataExport = cloudData;
-        } else {
-            try { const { data } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id); cloudDataExport = data || []; } catch(e) {}
-        }
-        const all = [...pendingRecords, ...cloudDataExport.map(d => ({ ...d, pending: false }))];
-        all.sort((a,b) => new Date(b.scanned_at) - new Date(a.scanned_at));
-        exportCSV(all);
-    });
-
-    exportXlsxBtn.addEventListener('click', async () => {
-        if (!currentUser) return;
-        let cloudDataExport = [];
-        if (cloudDataLoaded) {
-            cloudDataExport = cloudData;
-        } else {
-            try { const { data } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id); cloudDataExport = data || []; } catch(e) {}
-        }
-        const all = [...pendingRecords, ...cloudDataExport.map(d => ({ ...d, pending: false }))];
-        all.sort((a,b) => new Date(b.scanned_at) - new Date(a.scanned_at));
-        exportXLSX(all);
-    });
-
-    function exportCSV(records) {
-        if (!records.length) { showToast('暂无数据', 'warning'); return; }
+        let records = allRecords; // 当前显示的所有原始记录
+        if (records.length === 0) { showToast('暂无数据', 'warning'); return; }
         const headers = ['单号','快递公司','扫描时间','备注','状态'];
         const rows = records.map(r => [r.tracking_number, r.carrier||'', new Date(r.scanned_at).toLocaleString(), r.notes||'', r.pending?'待同步':'已同步']);
         const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -1740,9 +1910,10 @@
         link.download = `快递记录_${new Date().toISOString().slice(0,10)}.csv`;
         link.click();
         URL.revokeObjectURL(link.href);
-    }
+    });
 
-    function exportXLSX(records) {
+    exportXlsxBtn.addEventListener('click', async () => {
+        let records = allRecords;
         if (!records.length) { showToast('暂无数据', 'warning'); return; }
         const data = records.map(r => ({
             '单号': r.tracking_number,
@@ -1755,7 +1926,7 @@
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '扫描记录');
         XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
-    }
+    });
 
     // 初始化
     loadPendingFromStorage();
