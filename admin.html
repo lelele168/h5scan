@@ -77,6 +77,28 @@
         .btn-danger { background: #ef4444; color: white; }
         .btn-danger:hover { background: #dc2626; }
         .btn-sm { padding: 8px 16px; font-size: 0.9rem; }
+        .tab-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 12px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 8px 24px;
+            font-size: 1rem;
+            border-radius: 40px;
+            cursor: pointer;
+            color: #64748b;
+            transition: all 0.2s;
+            font-weight: 600;
+        }
+        .tab-btn.active {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
         .filter-bar {
             display: flex;
             flex-wrap: wrap;
@@ -291,64 +313,104 @@
                     <span id="adminFlag" class="admin-badge" style="display: none;">管理员</span>
                 </div>
                 <div>
-                    <button id="settingsBtn" class="settings-btn" title="用户设置">⚙️</button>
+                    <button id="settingsBtn" class="settings-btn" title="账户设置">⚙️</button>
                 </div>
             </div>
 
-            <!-- 筛选工具栏 -->
-            <div class="filter-bar">
-                <div class="filter-group">
-                    <label>开始日期</label>
-                    <input type="datetime-local" id="filterStart">
+            <!-- 选项卡：数据管理 / 用户管理 -->
+            <div class="tab-bar">
+                <button id="tabDataBtn" class="tab-btn active">📋 数据管理</button>
+                <button id="tabUsersBtn" class="tab-btn">👥 用户管理</button>
+            </div>
+
+            <!-- 数据管理面板 -->
+            <div id="dataPanel">
+                <div class="filter-bar">
+                    <div class="filter-group">
+                        <label>开始日期</label>
+                        <input type="datetime-local" id="filterStart">
+                    </div>
+                    <div class="filter-group">
+                        <label>结束日期</label>
+                        <input type="datetime-local" id="filterEnd">
+                    </div>
+                    <div class="filter-group">
+                        <label>备注包含</label>
+                        <input type="text" id="filterNote" placeholder="关键词">
+                    </div>
+                    <div class="filter-group">
+                        <label>快递公司</label>
+                        <select id="filterCarrier">
+                            <option value="">全部</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" id="userFilterGroup">
+                        <label>用户 ID</label>
+                        <select id="filterUserId">
+                            <option value="">全部</option>
+                        </select>
+                    </div>
+                    <div class="filter-actions">
+                        <button id="applyFilterBtn" class="btn btn-primary">应用筛选</button>
+                        <button id="resetFilterBtn" class="btn">重置</button>
+                        <button id="exportBtn" class="btn btn-success">📥 导出 XLSX</button>
+                    </div>
                 </div>
-                <div class="filter-group">
-                    <label>结束日期</label>
-                    <input type="datetime-local" id="filterEnd">
+
+                <!-- 统计信息 -->
+                <div style="margin: 16px 0; font-size: 1rem; color: #475569;">
+                    共 <span id="totalCount">0</span> 条记录
                 </div>
-                <div class="filter-group">
-                    <label>备注包含</label>
-                    <input type="text" id="filterNote" placeholder="关键词">
-                </div>
-                <div class="filter-group">
-                    <label>快递公司</label>
-                    <select id="filterCarrier">
-                        <option value="">全部</option>
-                    </select>
-                </div>
-                <div class="filter-group" id="userFilterGroup">
-                    <label>用户 ID</label>
-                    <select id="filterUserId">
-                        <option value="">全部</option>
-                    </select>
-                </div>
-                <div class="filter-actions">
-                    <button id="applyFilterBtn" class="btn btn-primary">应用筛选</button>
-                    <button id="resetFilterBtn" class="btn">重置</button>
-                    <button id="exportBtn" class="btn btn-success">📥 导出 XLSX</button>
+
+                <!-- 数据表格容器（滚动） -->
+                <div style="overflow-x: auto;">
+                    <table id="dataTable">
+                        <thead>
+                            <tr>
+                                <th>单号</th>
+                                <th>快递公司</th>
+                                <th>扫描时间</th>
+                                <th>备注</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tableBody"></tbody>
+                    </table>
                 </div>
             </div>
 
-            <!-- 统计信息 -->
-            <div style="margin: 16px 0; font-size: 1rem; color: #475569;">
-                共 <span id="totalCount">0</span> 条记录
+            <!-- 用户管理面板（初始隐藏） -->
+            <div id="usersPanel" style="display: none;">
+                <div class="filter-bar">
+                    <div class="filter-actions" style="margin-left: auto;">
+                        <button id="addUserBtn" class="btn btn-success">➕ 新增用户</button>
+                    </div>
+                </div>
+
+                <!-- 用户列表 -->
+                <div style="overflow-x: auto;">
+                    <table id="usersTable">
+                        <thead>
+                            <tr>
+                                <th>邮箱</th>
+                                <th>创建时间</th>
+                                <th>最后登录</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="usersTableBody"></tbody>
+                    </table>
+                </div>
+                <p id="noUsersMsg" style="color:#94a3b8; text-align:center; padding:30px; display:none;">暂无用户</p>
+
+                <!-- 用户分页 -->
+                <div class="pagination" id="usersPagination">
+                    <button id="prevUsersPageBtn" disabled>◀ 上一页</button>
+                    <span id="usersPageInfo">第 1 页 / 共 1 页</span>
+                    <button id="nextUsersPageBtn" disabled>下一页 ▶</button>
+                </div>
             </div>
 
-            <!-- 数据表格容器（滚动） -->
-            <div style="overflow-x: auto;">
-                <table id="dataTable">
-                    <thead>
-                        <tr>
-                            <th>单号</th>
-                            <th>快递公司</th>
-                            <th>扫描时间</th>
-                            <th>备注</th>
-                        </tr>
-                    </thead>
-                    <tbody id="tableBody"></tbody>
-                </table>
-            </div>
-
-            <!-- 分页控件 -->
+            <!-- 分页控件（数据管理用） -->
             <div class="pagination" id="pagination">
                 <button id="prevPageBtn" disabled>◀ 上一页</button>
                 <span id="pageInfo">第 1 页 / 共 1 页</span>
@@ -358,7 +420,7 @@
     </div>
 </div>
 
-<!-- 用户设置模态框（修改邮箱/密码） -->
+<!-- 账户设置模态框（修改邮箱/密码） -->
 <div id="settingsModal" class="modal">
     <div class="modal-content">
         <h3>账户设置</h3>
@@ -376,6 +438,19 @@
     </div>
 </div>
 
+<!-- 新增/编辑用户模态框 -->
+<div id="userModal" class="modal">
+    <div class="modal-content">
+        <h3 id="userModalTitle">新增用户</h3>
+        <input type="email" id="userEmail" placeholder="邮箱">
+        <input type="password" id="userPassword" placeholder="密码（至少6位）">
+        <div class="modal-buttons">
+            <button id="cancelUserBtn" class="btn">取消</button>
+            <button id="saveUserBtn" class="btn btn-primary">保存</button>
+        </div>
+    </div>
+</div>
+
 <!-- 全局 Toast 提示 -->
 <div id="toast" class="toast-message"></div>
 
@@ -383,7 +458,12 @@
     // ================== 配置 ==================
     const SUPABASE_URL = 'https://vmkpymrujtvguvmzcisc.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu';
+    // 服务角色密钥（用于用户管理，请务必替换为你的密钥，并妥善保管）
+    const SUPABASE_SERVICE_KEY = 'your-service-role-key-here'; // 请替换为实际密钥
+
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    // 使用服务角色密钥的客户端（仅用于用户管理）
+    const sbAdmin = window.supabase.createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
     // 管理员邮箱（可在此修改）
     const ADMIN_EMAIL = 'admin@example.com';
@@ -393,6 +473,11 @@
     let filteredRecords = [];
     let currentPage = 1;
     const pageSize = 20;
+
+    // 用户管理相关
+    let allUsers = [];
+    let usersCurrentPage = 1;
+    const usersPageSize = 20;
 
     // DOM 元素
     const authArea = document.getElementById('authArea');
@@ -413,6 +498,13 @@
     const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
     const saveSettingsBtn = document.getElementById('saveSettingsBtn');
 
+    // 选项卡
+    const tabDataBtn = document.getElementById('tabDataBtn');
+    const tabUsersBtn = document.getElementById('tabUsersBtn');
+    const dataPanel = document.getElementById('dataPanel');
+    const usersPanel = document.getElementById('usersPanel');
+
+    // 数据管理元素
     const filterStart = document.getElementById('filterStart');
     const filterEnd = document.getElementById('filterEnd');
     const filterNote = document.getElementById('filterNote');
@@ -426,6 +518,20 @@
     const prevPageBtn = document.getElementById('prevPageBtn');
     const nextPageBtn = document.getElementById('nextPageBtn');
     const pageInfo = document.getElementById('pageInfo');
+
+    // 用户管理元素
+    const addUserBtn = document.getElementById('addUserBtn');
+    const usersTableBody = document.getElementById('usersTableBody');
+    const noUsersMsg = document.getElementById('noUsersMsg');
+    const prevUsersPageBtn = document.getElementById('prevUsersPageBtn');
+    const nextUsersPageBtn = document.getElementById('nextUsersPageBtn');
+    const usersPageInfo = document.getElementById('usersPageInfo');
+    const userModal = document.getElementById('userModal');
+    const userModalTitle = document.getElementById('userModalTitle');
+    const userEmail = document.getElementById('userEmail');
+    const userPassword = document.getElementById('userPassword');
+    const cancelUserBtn = document.getElementById('cancelUserBtn');
+    const saveUserBtn = document.getElementById('saveUserBtn');
 
     const toast = document.getElementById('toast');
 
@@ -452,19 +558,17 @@
         return user && user.email === ADMIN_EMAIL;
     }
 
-    // ================== 加载数据 ==================
+    // ================== 加载数据（扫描记录）==================
     async function loadData() {
         if (!currentUser) return;
         try {
             let query = sbClient.from('scans').select('*').order('scanned_at', { ascending: false });
-            // 如果不是管理员，只加载自己的数据
             if (!isAdmin(currentUser)) {
                 query = query.eq('user_id', currentUser.id);
             }
             const { data, error } = await query;
             if (error) throw error;
             allRecords = data || [];
-            // 更新筛选下拉选项
             updateFilterOptions();
             applyFilter();
         } catch (err) {
@@ -473,14 +577,11 @@
         }
     }
 
-    // 更新筛选下拉框
     function updateFilterOptions() {
-        // 快递公司选项
         const carriers = [...new Set(allRecords.map(r => r.carrier).filter(Boolean))];
         carriers.sort();
         filterCarrier.innerHTML = '<option value="">全部</option>' + carriers.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
 
-        // 用户ID选项（仅管理员可见）
         if (isAdmin(currentUser)) {
             const userIds = [...new Set(allRecords.map(r => r.user_id).filter(Boolean))];
             userIds.sort();
@@ -491,40 +592,20 @@
         }
     }
 
-    // ================== 筛选逻辑 ==================
     function applyFilter() {
         let records = allRecords;
-
-        // 时间范围
         const start = filterStart.value ? new Date(filterStart.value) : null;
         const end = filterEnd.value ? new Date(filterEnd.value) : null;
-        if (start) {
-            records = records.filter(r => new Date(r.scanned_at) >= start);
-        }
-        if (end) {
-            records = records.filter(r => new Date(r.scanned_at) <= end);
-        }
-
-        // 备注包含
+        if (start) records = records.filter(r => new Date(r.scanned_at) >= start);
+        if (end) records = records.filter(r => new Date(r.scanned_at) <= end);
         const noteKeyword = filterNote.value.trim().toLowerCase();
-        if (noteKeyword) {
-            records = records.filter(r => (r.notes || '').toLowerCase().includes(noteKeyword));
-        }
-
-        // 快递公司
+        if (noteKeyword) records = records.filter(r => (r.notes || '').toLowerCase().includes(noteKeyword));
         const carrier = filterCarrier.value;
-        if (carrier) {
-            records = records.filter(r => r.carrier === carrier);
-        }
-
-        // 用户ID（仅管理员）
+        if (carrier) records = records.filter(r => r.carrier === carrier);
         if (isAdmin(currentUser)) {
             const userId = filterUserId.value;
-            if (userId) {
-                records = records.filter(r => r.user_id === userId);
-            }
+            if (userId) records = records.filter(r => r.user_id === userId);
         }
-
         filteredRecords = records;
         totalCountSpan.innerText = filteredRecords.length;
         currentPage = 1;
@@ -540,18 +621,14 @@
         applyFilter();
     }
 
-    // ================== 分页渲染 ==================
     function renderPage() {
         const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
         if (currentPage < 1) currentPage = 1;
         if (currentPage > totalPages) currentPage = totalPages;
-
         const start = (currentPage - 1) * pageSize;
         const end = start + pageSize;
         const pageRecords = filteredRecords.slice(start, end);
-
         renderTable(pageRecords);
-
         pageInfo.innerText = `第 ${currentPage} 页 / 共 ${totalPages} 页`;
         prevPageBtn.disabled = currentPage <= 1;
         nextPageBtn.disabled = currentPage >= totalPages;
@@ -590,15 +667,190 @@
         XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
-    // ================== 用户设置（修改邮箱/密码） ==================
-    async function updateEmail(newEmail) {
-        const { error } = await sbClient.auth.updateUser({ email: newEmail });
+    // ================== 用户管理 ==================
+    async function loadUsers() {
+        if (!isAdmin(currentUser)) return;
+        try {
+            // 使用 admin 客户端获取用户列表
+            const { data, error } = await sbAdmin.auth.admin.listUsers();
+            if (error) throw error;
+            allUsers = data.users || [];
+            renderUsersPage();
+        } catch (err) {
+            console.error('加载用户列表失败', err);
+            showToast('加载用户列表失败，请检查服务角色密钥', 'error');
+        }
+    }
+
+    function renderUsersPage() {
+        const totalPages = Math.ceil(allUsers.length / usersPageSize) || 1;
+        if (usersCurrentPage < 1) usersCurrentPage = 1;
+        if (usersCurrentPage > totalPages) usersCurrentPage = totalPages;
+        const start = (usersCurrentPage - 1) * usersPageSize;
+        const end = start + usersPageSize;
+        const pageUsers = allUsers.slice(start, end);
+        renderUsersTable(pageUsers);
+        usersPageInfo.innerText = `第 ${usersCurrentPage} 页 / 共 ${totalPages} 页`;
+        prevUsersPageBtn.disabled = usersCurrentPage <= 1;
+        nextUsersPageBtn.disabled = usersCurrentPage >= totalPages;
+    }
+
+    function renderUsersTable(users) {
+        if (users.length === 0) {
+            usersTableBody.innerHTML = '';
+            noUsersMsg.style.display = 'block';
+            return;
+        }
+        noUsersMsg.style.display = 'none';
+        usersTableBody.innerHTML = users.map(u => `
+            <tr>
+                <td>${escapeHtml(u.email)}</td>
+                <td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td>
+                <td>${u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : '未登录'}</td>
+                <td>
+                    <button class="btn btn-sm edit-user" data-id="${u.id}" data-email="${escapeHtml(u.email)}">✏️ 编辑</button>
+                    <button class="btn btn-sm reset-pwd" data-id="${u.id}">🔑 重置密码</button>
+                </td>
+            </tr>
+        `).join('');
+
+        // 绑定编辑事件
+        document.querySelectorAll('.edit-user').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id;
+                const email = btn.dataset.email;
+                openEditUserModal(id, email);
+            });
+        });
+
+        // 绑定重置密码事件
+        document.querySelectorAll('.reset-pwd').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                const newPwd = prompt('请输入新密码（至少6位）');
+                if (newPwd && newPwd.length >= 6) {
+                    try {
+                        const { error } = await sbAdmin.auth.admin.updateUserById(id, { password: newPwd });
+                        if (error) throw error;
+                        showToast('密码已重置', 'success');
+                    } catch (err) {
+                        showToast(err.message, 'error');
+                    }
+                } else if (newPwd) {
+                    showToast('密码至少6位', 'warning');
+                }
+            });
+        });
+    }
+
+    // 新增用户
+    addUserBtn.addEventListener('click', () => {
+        userModalTitle.innerText = '新增用户';
+        userEmail.value = '';
+        userPassword.value = '';
+        userModal.classList.add('show');
+    });
+
+    // 编辑用户
+    function openEditUserModal(id, email) {
+        userModalTitle.innerText = '编辑用户';
+        userEmail.value = email;
+        userPassword.value = ''; // 密码留空，不修改
+        userModal.dataset.editId = id;
+        userModal.classList.add('show');
+    }
+
+    cancelUserBtn.addEventListener('click', () => {
+        userModal.classList.remove('show');
+    });
+
+    saveUserBtn.addEventListener('click', async () => {
+        const email = userEmail.value.trim();
+        const password = userPassword.value.trim();
+        const isEdit = userModalTitle.innerText.includes('编辑');
+        const id = userModal.dataset.editId;
+
+        if (!email) {
+            showToast('邮箱不能为空', 'warning');
+            return;
+        }
+
+        try {
+            if (isEdit) {
+                // 编辑用户
+                const updates = {};
+                if (email) updates.email = email;
+                if (password) updates.password = password;
+                const { error } = await sbAdmin.auth.admin.updateUserById(id, updates);
+                if (error) throw error;
+                showToast('用户更新成功', 'success');
+            } else {
+                // 新增用户
+                if (!password || password.length < 6) {
+                    showToast('密码至少6位', 'warning');
+                    return;
+                }
+                const { error } = await sbAdmin.auth.admin.createUser({ email, password });
+                if (error) throw error;
+                showToast('用户创建成功', 'success');
+            }
+            userModal.classList.remove('show');
+            loadUsers();
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    });
+
+    // 用户分页
+    prevUsersPageBtn.addEventListener('click', () => {
+        if (usersCurrentPage > 1) {
+            usersCurrentPage--;
+            renderUsersPage();
+        }
+    });
+    nextUsersPageBtn.addEventListener('click', () => {
+        const totalPages = Math.ceil(allUsers.length / usersPageSize);
+        if (usersCurrentPage < totalPages) {
+            usersCurrentPage++;
+            renderUsersPage();
+        }
+    });
+
+    // ================== 选项卡切换 ==================
+    function switchTab(tab) {
+        if (tab === 'data') {
+            tabDataBtn.classList.add('active');
+            tabUsersBtn.classList.remove('active');
+            dataPanel.style.display = 'block';
+            usersPanel.style.display = 'none';
+        } else {
+            tabDataBtn.classList.remove('active');
+            tabUsersBtn.classList.add('active');
+            dataPanel.style.display = 'none';
+            usersPanel.style.display = 'block';
+            if (isAdmin(currentUser)) {
+                loadUsers();
+            }
+        }
+    }
+
+    tabDataBtn.addEventListener('click', () => switchTab('data'));
+    tabUsersBtn.addEventListener('click', () => {
+        if (!isAdmin(currentUser)) {
+            showToast('只有管理员可访问用户管理', 'warning');
+            return;
+        }
+        switchTab('users');
+    });
+
+    // ================== 账户设置 ==================
+    async function updateEmail(email) {
+        const { error } = await sbClient.auth.updateUser({ email });
         if (error) throw error;
         showToast('邮箱修改成功，请查收确认邮件', 'success');
     }
 
     async function updatePassword(oldPwd, newPwd) {
-        // 验证旧密码：重新登录
         const { error: signInError } = await sbClient.auth.signInWithPassword({
             email: currentUser.email,
             password: oldPwd
@@ -610,7 +862,6 @@
     }
 
     settingsBtn.addEventListener('click', () => {
-        // 清空输入框
         newEmail.value = '';
         oldPassword.value = '';
         newPassword.value = '';
@@ -628,13 +879,10 @@
         const newPwd = newPassword.value.trim();
         const confirmPwd = confirmPassword.value.trim();
 
-        // 如果邮箱和密码都为空，提示
         if (!email && !oldPwd && !newPwd) {
             showToast('请填写要修改的内容', 'warning');
             return;
         }
-
-        // 如果修改密码，需要验证
         if (newPwd || oldPwd || confirmPwd) {
             if (!oldPwd || !newPwd || !confirmPwd) {
                 showToast('修改密码需填写所有密码字段', 'warning');
@@ -651,19 +899,10 @@
         }
 
         try {
-            // 先修改密码（如果提供了密码）
-            if (newPwd) {
-                await updatePassword(oldPwd, newPwd);
-            }
-            // 再修改邮箱（如果提供了邮箱）
-            if (email && email !== currentUser.email) {
-                await updateEmail(email);
-            } else if (email === currentUser.email) {
-                showToast('新邮箱与当前相同', 'warning');
-            }
-            if (!email && !newPwd) {
-                showToast('没有要修改的内容', 'warning');
-            }
+            if (newPwd) await updatePassword(oldPwd, newPwd);
+            if (email && email !== currentUser.email) await updateEmail(email);
+            else if (email === currentUser.email) showToast('新邮箱与当前相同', 'warning');
+            if (!email && !newPwd) showToast('没有要修改的内容', 'warning');
             settingsModal.classList.remove('show');
         } catch (err) {
             showToast(err.message, 'error');
@@ -684,8 +923,11 @@
         userInfoDiv.innerText = `👤 ${user.email}`;
         if (isAdmin(user)) {
             adminFlag.style.display = 'inline';
+            // 管理员可看到用户管理标签
+            tabUsersBtn.style.display = 'inline-block';
         } else {
             adminFlag.style.display = 'none';
+            tabUsersBtn.style.display = 'none';
         }
         loadData();
     }
