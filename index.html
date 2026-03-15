@@ -2,8 +2,8 @@
 <html lang="zh">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>快递扫码系统 · 最终版</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>快递扫码系统 · 响应式版</title>
     <!-- QuaggaJS 扫码库 -->
     <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <!-- Supabase JS 客户端 -->
@@ -12,20 +12,83 @@
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Roboto, system-ui, sans-serif; background: #f3f6fc; min-height: 100vh; display: flex; justify-content: center; padding: 16px; }
-        .app { max-width: 1000px; width: 100%; }
-        .card { background: white; border-radius: 24px; padding: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
-        h1 { font-size: 1.8rem; font-weight: 600; color: #1e293b; display: flex; align-items: center; gap: 8px; }
-        h2 { font-size: 1.3rem; font-weight: 500; margin: 20px 0 16px; color: #334155; }
-        .tabs { display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; }
-        .tab-btn { background: none; border: none; padding: 8px 16px; font-size: 1rem; border-radius: 40px; cursor: pointer; color: #64748b; transition: 0.2s; }
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, -apple-system, sans-serif;
+            background: #f3f6fc;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            padding: 12px;
+        }
+        .app { max-width: 1200px; width: 100%; }
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 20px 16px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        h1 {
+            font-size: 1.6rem;
+            font-weight: 600;
+            color: #1e293b;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        h2 {
+            font-size: 1.3rem;
+            font-weight: 500;
+            margin: 20px 0 16px;
+            color: #334155;
+        }
+        .tabs { display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; flex-wrap: wrap; }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 8px 16px;
+            font-size: 1rem;
+            border-radius: 40px;
+            cursor: pointer;
+            color: #64748b;
+            transition: 0.2s;
+        }
         .tab-btn.active { background: #e0f2fe; color: #0369a1; font-weight: 500; }
         .auth-container { display: flex; flex-direction: column; gap: 20px; max-width: 400px; margin: 40px auto; }
         .auth-form { display: flex; flex-direction: column; gap: 16px; }
-        .auth-form input { padding: 14px 18px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; outline: none; transition: 0.2s; }
+        .auth-form input {
+            padding: 14px 18px;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            font-size: 1rem;
+            outline: none;
+            transition: 0.2s;
+        }
         .auth-form input:focus { border-color: #0284c7; box-shadow: 0 0 0 3px #bae6fd; }
-        .btn { padding: 12px 24px; border: none; border-radius: 40px; font-size: 1rem; font-weight: 500; cursor: pointer; transition: 0.2s; background: #e2e8f0; color: #1e293b; }
+        .btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 40px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+            background: #e2e8f0;
+            color: #1e293b;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            white-space: nowrap;
+        }
         .btn-primary { background: #0284c7; color: white; }
         .btn-primary:hover { background: #0369a1; }
         .btn-success { background: #10b981; color: white; }
@@ -36,82 +99,363 @@
         .btn-danger:hover { background: #dc2626; }
         .btn-sm { padding: 6px 14px; font-size: 0.9rem; }
         .flex-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-        .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .status-bar { display: flex; gap: 12px; align-items: center; }
-        .sync-status { display: flex; align-items: center; gap: 8px; background: #f1f5f9; padding: 6px 16px; border-radius: 40px; font-size: 0.9rem; cursor: pointer; }
+        .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px; }
+        .status-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f1f5f9;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
         .sync-status.online { color: #10b981; }
         .sync-status.offline { color: #ef4444; }
         .sync-status.syncing { color: #f59e0b; }
-        .sound-toggle { background: #f1f5f9; border: none; border-radius: 40px; padding: 6px 16px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .sound-toggle {
+            background: #f1f5f9;
+            border: none;
+            border-radius: 40px;
+            padding: 6px 16px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
         .sound-toggle.on { color: #0284c7; }
         .sound-toggle.off { color: #94a3b8; }
-        .scanner-container { width: 100%; border-radius: 20px; overflow: hidden; background: #0f172a; margin: 20px 0; position: relative; }
-        #interactive.viewport { position: relative; width: 100%; max-height: 350px; overflow: hidden; }
-        #interactive.viewport video, #interactive.viewport canvas { width: 100%; height: auto; display: block; }
-        .scanner-controls { display: flex; gap: 10px; margin: 10px 0; justify-content: center; }
-        .manual-section { display: flex; gap: 10px; margin: 20px 0; justify-content: center; }
-        .note-section { display: flex; gap: 10px; margin: 10px 0; align-items: center; flex-wrap: wrap; }
-        .note-section input { flex: 1; min-width: 150px; max-width: 250px; padding: 10px 14px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; }
-        .lock-toggle { background: #f1f5f9; border: none; border-radius: 40px; padding: 6px 16px; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; gap: 4px; }
+        .scanner-container {
+            width: 100%;
+            border-radius: 20px;
+            overflow: hidden;
+            background: #0f172a;
+            margin: 20px 0;
+            position: relative;
+        }
+        #interactive.viewport {
+            position: relative;
+            width: 100%;
+            max-height: 400px;
+            overflow: hidden;
+        }
+        #interactive.viewport video, #interactive.viewport canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .scanner-controls {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .manual-section {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .note-section {
+            display: flex;
+            gap: 10px;
+            margin: 10px 0;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .note-section input {
+            flex: 1 1 180px;
+            min-width: 150px;
+            padding: 10px 14px;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            font-size: 1rem;
+        }
+        .lock-toggle {
+            background: #f1f5f9;
+            border: none;
+            border-radius: 40px;
+            padding: 6px 16px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
         .lock-toggle.locked { color: #0284c7; }
         .lock-toggle.unlocked { color: #94a3b8; }
-        .result-card { background: #e6f7ff; padding: 16px; border-radius: 20px; margin: 20px 0; border-left: 6px solid #0284c7; transition: all 0.3s; }
+        .result-card {
+            background: #e6f7ff;
+            padding: 16px;
+            border-radius: 20px;
+            margin: 20px 0;
+            border-left: 6px solid #0284c7;
+            transition: all 0.3s;
+        }
         .result-card.invalid { border-left-color: #ef4444; background: #fee2e2; }
-        .carrier-badge { background: #0284c7; color: white; padding: 4px 14px; border-radius: 40px; font-size: 0.85rem; display: inline-block; font-weight: 500; }
-        .pending-badge { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 40px; font-size: 0.7rem; margin-left: 6px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.95rem; }
-        th { text-align: left; padding: 12px 8px; background: #f8fafc; color: #475569; font-weight: 500; }
-        td { padding: 12px 8px; border-bottom: 1px solid #e2e8f0; }
-        .delete-btn, .copy-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 0 6px; transition: 0.2s; }
+        .carrier-badge {
+            background: #0284c7;
+            color: white;
+            padding: 4px 14px;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            display: inline-block;
+            font-weight: 500;
+        }
+        .pending-badge {
+            background: #f59e0b;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            margin-left: 6px;
+        }
+        .stats-panel {
+            background: #f8fafc;
+            border-radius: 20px;
+            padding: 16px;
+            margin: 20px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            align-items: center;
+        }
+        .stat-item { display: flex; flex-direction: column; }
+        .stat-label { font-size: 0.85rem; color: #64748b; }
+        .stat-value { font-size: 1.5rem; font-weight: 600; color: #0f172a; }
+        .carrier-stats {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .carrier-stat {
+            background: white;
+            padding: 4px 12px;
+            border-radius: 40px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            font-size: 0.9rem;
+        }
+        .search-box {
+            flex: 1 1 200px;
+            min-width: 180px;
+            padding: 10px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            font-size: 1rem;
+        }
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin: 16px 0;
+        }
+        .clear-select {
+            padding: 10px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            font-size: 1rem;
+            background: white;
+        }
+        .data-source-switch {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .data-source-switch button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 40px;
+            background: #e2e8f0;
+            cursor: pointer;
+            font-size: 0.95rem;
+        }
+        .data-source-switch button.active { background: #0284c7; color: white; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 0.95rem;
+            min-width: 600px; /* 保证在窄屏时触发滚动 */
+        }
+        th {
+            text-align: left;
+            padding: 12px 8px;
+            background: #f8fafc;
+            color: #475569;
+            font-weight: 500;
+        }
+        td {
+            padding: 12px 8px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .delete-btn, .copy-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            padding: 0 6px;
+            transition: 0.2s;
+        }
         .copy-btn { color: #0284c7; }
         .copy-btn:hover { color: #0369a1; }
         .delete-btn { color: #ef4444; }
         .delete-btn:hover { color: #b91c1c; }
         .export-btn { background: #0f172a; color: white; }
-        .stats-panel { background: #f8fafc; border-radius: 20px; padding: 16px; margin: 20px 0; display: flex; flex-wrap: wrap; gap: 24px; align-items: center; }
-        .stat-item { display: flex; flex-direction: column; }
-        .stat-label { font-size: 0.85rem; color: #64748b; }
-        .stat-value { font-size: 1.5rem; font-weight: 600; color: #0f172a; }
-        .carrier-stats { display: flex; flex-wrap: wrap; gap: 12px; }
-        .carrier-stat { background: white; padding: 4px 12px; border-radius: 40px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .search-box { flex: 1; min-width: 200px; padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; }
-        .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0; }
-        .clear-select { padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; background: white; }
-        .footer-note { text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 30px; }
+        .footer-note {
+            text-align: center;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            margin-top: 30px;
+        }
         .error-msg { color: #dc2626; font-size: 0.9rem; margin-top: 8px; }
-        .badge { background: #ef4444; color: white; border-radius: 20px; padding: 2px 8px; font-size: 0.7rem; margin-left: 6px; }
-        .toast-message { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 24px; border-radius: 40px; font-size: 1rem; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: opacity 0.3s; opacity: 0; pointer-events: none; }
+        .badge {
+            background: #ef4444;
+            color: white;
+            border-radius: 20px;
+            padding: 2px 8px;
+            font-size: 0.7rem;
+            margin-left: 6px;
+        }
+        .toast-message {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 10px 24px;
+            border-radius: 40px;
+            font-size: 1rem;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: opacity 0.3s;
+            opacity: 0;
+            pointer-events: none;
+        }
         .toast-message.show { opacity: 1; }
         .toast-message.success { background: #10b981; }
         .toast-message.error { background: #ef4444; }
         .toast-message.warning { background: #f59e0b; }
-        .scan-toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 12px 24px; border-radius: 40px; font-size: 1.2rem; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: opacity 0.3s; opacity: 0; pointer-events: none; white-space: nowrap; max-width: 80%; overflow: hidden; text-overflow: ellipsis; }
+        .scan-toast {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-size: 1.2rem;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            transition: opacity 0.3s;
+            opacity: 0;
+            pointer-events: none;
+            white-space: nowrap;
+            max-width: 80%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         .scan-toast.show { opacity: 1; }
-        /* 分页控件 */
-        .pagination { display: flex; gap: 8px; justify-content: center; align-items: center; margin-top: 20px; flex-wrap: wrap; }
-        .pagination button { padding: 8px 16px; border: none; border-radius: 40px; background: #e2e8f0; cursor: pointer; }
+        .pagination {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+        .pagination button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 40px;
+            background: #e2e8f0;
+            cursor: pointer;
+        }
         .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
         .pagination span { font-size: 0.95rem; color: #475569; }
-        /* 数据源切换按钮 */
-        .data-source-switch { display: flex; gap: 8px; margin-left: 10px; }
-        .data-source-switch button { padding: 8px 16px; border: none; border-radius: 40px; background: #e2e8f0; cursor: pointer; }
-        .data-source-switch button.active { background: #0284c7; color: white; }
-        /* 模态框 */
-        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 2000; }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 16px;
+        }
         .modal.show { display: flex; }
-        .modal-content { background: white; border-radius: 24px; padding: 24px; max-width: 400px; width: 90%; }
+        .modal-content {
+            background: white;
+            border-radius: 24px;
+            padding: 24px;
+            max-width: 400px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
         .modal-content h3 { margin-bottom: 20px; }
-        .modal-content input { width: 100%; padding: 12px 16px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; margin-bottom: 20px; }
-        .modal-buttons { display: flex; gap: 10px; justify-content: flex-end; }
-        .test-sound { margin-top: 10px; text-align: center; }
-        .test-sound button { background: #e2e8f0; border: none; border-radius: 40px; padding: 6px 16px; cursor: pointer; }
+        .modal-content input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            font-size: 1rem;
+            margin-bottom: 20px;
+        }
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        .test-sound {
+            margin: 10px 0;
+            text-align: center;
+        }
+        .test-sound button {
+            background: #e2e8f0;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 20px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+        /* 响应式调整 */
+        @media (max-width: 640px) {
+            h1 { font-size: 1.4rem; }
+            .btn { padding: 10px 16px; font-size: 0.95rem; }
+            .stats-panel { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .carrier-stats { width: 100%; }
+            .toolbar { flex-direction: column; align-items: stretch; }
+            .search-box { width: 100%; }
+            .clear-select { width: 100%; }
+            .data-source-switch { justify-content: center; }
+            .table-container { overflow-x: auto; }
+            .note-section { flex-direction: column; align-items: stretch; }
+            .note-section input { width: 100%; }
+            .lock-toggle { align-self: flex-end; }
+            .scanner-controls button { flex: 1; }
+        }
+        @media (max-width: 480px) {
+            .header-row { flex-direction: column; align-items: flex-start; }
+            .status-bar { width: 100%; justify-content: space-between; }
+            .modal-content { padding: 16px; }
+        }
     </style>
 </head>
 <body>
 <div class="app">
     <div class="card">
         <div class="header-row">
-            <h1>📦 快递扫码 · 最终版</h1>
+            <h1>📦 快递扫码 · 响应式版</h1>
             <div class="status-bar">
                 <button id="soundToggleBtn" class="sound-toggle on" title="声音提醒">🔊</button>
                 <div id="syncStatus" class="sync-status online" title="点击立即同步">🟢 在线</div>
@@ -205,14 +549,14 @@
                     <button id="dataSourceAll" class="active">全部数据</button>
                     <button id="dataSourceCloud">云端数据</button>
                 </div>
-                <div style="display: flex; gap: 8px; margin-left: auto;">
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                     <button id="exportCsvBtn" class="btn export-btn">📥 CSV</button>
                     <button id="exportXlsxBtn" class="btn btn-success">📊 XLSX</button>
                 </div>
             </div>
 
-            <!-- 数据表格 -->
-            <div style="overflow-x: auto;">
+            <!-- 数据表格容器（滚动） -->
+            <div class="table-container" style="overflow-x: auto;">
                 <table id="historyTable">
                     <thead>
                         <tr>
@@ -280,8 +624,8 @@
     let isScanning = false;
     let lastScannedCode = '';
     let lastScanTime = 0;
-    let allRecords = [];          // 合并后的所有记录（用于统计，但实际显示由数据源决定）
-    let cloudData = [];            // 纯云端数据
+    let allRecords = [];
+    let cloudData = [];
     let sessionStartTime = null;
 
     // 语音相关
@@ -298,7 +642,7 @@
     // 分页相关
     let currentPage = 1;
     const pageSize = 10;
-    let filteredRecords = [];      // 当前显示的记录（经过数据源和搜索过滤）
+    let filteredRecords = [];
 
     // 数据源模式：'all' 或 'cloud'
     let dataSourceMode = 'all';
@@ -395,14 +739,12 @@
             showToast('浏览器不支持语音合成', 'error');
             return;
         }
-        // 取消任何正在进行的朗读
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'zh-CN';
         utterance.rate = 0.9;
         utterance.pitch = 1.2;
         utterance.volume = 1;
-        // 尝试选择女性声音
         const voices = window.speechSynthesis.getVoices();
         const femaleVoice = voices.find(voice => voice.lang.includes('zh') && voice.name.includes('Female'));
         if (femaleVoice) utterance.voice = femaleVoice;
@@ -412,7 +754,6 @@
         window.speechSynthesis.speak(utterance);
     }
 
-    // 测试声音按钮
     testSoundBtn.addEventListener('click', () => {
         speak('测试声音');
         showToast('测试声音已播放，请听是否有声音', 'info');
@@ -427,14 +768,12 @@
         else navigator.vibrate([100, 50, 100]);
     }
 
-    // 显示普通 Toast 消息
     function showToast(message, type = 'success', duration = 2000) {
         toast.className = `toast-message show ${type}`;
         toast.textContent = message;
         setTimeout(() => toast.classList.remove('show'), duration);
     }
 
-    // 显示扫码单号临时提示
     function showScanToast(code) {
         scanToast.className = 'scan-toast show';
         scanToast.textContent = `📦 ${code}`;
@@ -452,7 +791,6 @@
             lockToggleBtn.className = 'lock-toggle unlocked';
             lockToggleBtn.innerHTML = '🔓';
             noteInput.disabled = false;
-            // 解锁后清空输入框
             noteInput.value = '';
         }
     }
@@ -460,7 +798,6 @@
     function toggleLock() {
         if (noteLocked) {
             noteLocked = false;
-            // 解锁时，lockedNote 保持不变，但输入框由 updateLockUI 清空
         } else {
             lockedNote = noteInput.value;
             noteLocked = true;
@@ -628,11 +965,8 @@
         cloudData = cloudDataRaw.map(item => ({ ...item, localId: null, pending: false }));
         allRecords = [...pendingRecords, ...cloudData];
         allRecords.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
-        
-        // 更新统计（基于全部数据）
+
         renderStats(allRecords);
-        
-        // 应用当前数据源和搜索
         applyDataSource();
     }
 
@@ -650,13 +984,12 @@
         ).join('');
     }
 
-    // 根据当前数据源和搜索词更新 filteredRecords
     function applyDataSource() {
         let baseRecords = [];
         if (dataSourceMode === 'all') {
             baseRecords = allRecords;
         } else {
-            baseRecords = cloudData; // 仅云端数据
+            baseRecords = cloudData;
         }
 
         const keyword = searchInput.value.trim().toLowerCase();
@@ -672,7 +1005,6 @@
         renderPage();
     }
 
-    // 包装函数，供搜索输入调用
     function applyFilter() {
         applyDataSource();
     }
@@ -800,10 +1132,9 @@
         updateSyncStatusUI();
     }
 
-    // ================== 数据源切换事件 ==================
+    // ================== 数据源切换 ==================
     function setDataSource(mode) {
         dataSourceMode = mode;
-        // 更新按钮状态
         if (mode === 'all') {
             dataSourceAll.classList.add('active');
             dataSourceCloud.classList.remove('active');
@@ -811,7 +1142,6 @@
             dataSourceCloud.classList.add('active');
             dataSourceAll.classList.remove('active');
         }
-        // 重新应用数据源和搜索
         applyDataSource();
     }
 
@@ -979,7 +1309,6 @@
         updateScanButtons();
         loadNoteOptions();
         noteLocked = false; lockedNote = ''; noteInput.value = ''; updateLockUI();
-        // 默认数据源为 all，按钮状态已在 HTML 中设置
     }
 
     sbClient.auth.onAuthStateChange((event, session) => {
@@ -1093,7 +1422,6 @@
     // 初始化
     loadPendingFromStorage();
     loadSoundPreference();
-    // 预加载语音列表
     if (window.speechSynthesis) {
         window.speechSynthesis.getVoices();
     }
