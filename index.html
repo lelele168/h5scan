@@ -1358,28 +1358,36 @@
         else if (!isOnline) { speak('离线无法同步'); showToast('当前处于离线状态，无法同步', 'error'); }
         else { speak('所有记录已同步'); showToast('所有记录已同步', 'success'); }
     });
-    exportCsvBtn.addEventListener('click', async () => {
-        let records = allRecords;
-        if (!records.length) { showToast('暂无数据', 'warning'); return; }
-        const headers = ['单号','快递公司','扫描时间','备注','照片'];
-        const rows = records.map(r => [r.tracking_number, r.carrier||'', new Date(r.scanned_at).toLocaleString(), r.notes||'', r.photo_url||'']);
-        const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
-        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `快递记录_${new Date().toISOString().slice(0,10)}.csv`;
-        link.click();
-        URL.revokeObjectURL(link.href);
-    });
-    exportXlsxBtn.addEventListener('click', async () => {
-        let records = allRecords;
-        if (!records.length) { showToast('暂无数据', 'warning'); return; }
-        const data = records.map(r => ({ '单号': r.tracking_number, '快递公司': r.carrier||'', '扫描时间': new Date(r.scanned_at).toLocaleString(), '备注': r.notes||'', '照片': r.photo_url||'' }));
-        const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, '扫描记录');
-        XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
-    });
+// 导出 CSV（移除照片列）
+exportCsvBtn.addEventListener('click', async () => {
+    let records = allRecords;
+    if (!records.length) { showToast('暂无数据', 'warning'); return; }
+    const headers = ['单号','快递公司','扫描时间','备注'];
+    const rows = records.map(r => [r.tracking_number, r.carrier||'', new Date(r.scanned_at).toLocaleString(), r.notes||'']);
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `快递记录_${new Date().toISOString().slice(0,10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+});
+
+// 导出 XLSX（移除照片列）
+exportXlsxBtn.addEventListener('click', async () => {
+    let records = allRecords;
+    if (!records.length) { showToast('暂无数据', 'warning'); return; }
+    const data = records.map(r => ({
+        '单号': r.tracking_number,
+        '快递公司': r.carrier || '',
+        '扫描时间': new Date(r.scanned_at).toLocaleString(),
+        '备注': r.notes || ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '扫描记录');
+    XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
+});
 
     // ================== 工具函数 ==================
     function escapeHtml(unsafe) { return unsafe.replace(/[&<>"']/g, m => { if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; if(m==='"') return '&quot;'; if(m==="'") return '&#039;'; return m; }); }
