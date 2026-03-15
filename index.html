@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>快递扫码系统 · 专业版</title>
+    <!-- QuaggaJS 扫码库 -->
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
+    <!-- Supabase JS 客户端 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- SheetJS 用于导出 XLSX -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Roboto, system-ui, sans-serif; background: #f3f6fc; min-height: 100vh; display: flex; justify-content: center; padding: 16px; }
+        .app { max-width: 1000px; width: 100%; }
+        .card { background: white; border-radius: 24px; padding: 24px; box-shadow: 0 8px 30px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        h1 { font-size: 1.8rem; font-weight: 600; margin-bottom: 8px; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+        h2 { font-size: 1.3rem; font-weight: 500; margin: 20px 0 16px; color: #334155; }
+        .tabs { display: flex; gap: 12px; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 12px; }
+        .tab-btn { background: none; border: none; padding: 8px 16px; font-size: 1rem; border-radius: 40px; cursor: pointer; color: #64748b; transition: 0.2s; }
+        .tab-btn.active { background: #e0f2fe; color: #0369a1; font-weight: 500; }
+        .auth-container { display: flex; flex-direction: column; gap: 20px; max-width: 400px; margin: 40px auto; }
+        .auth-form { display: flex; flex-direction: column; gap: 16px; }
+        .auth-form input { padding: 14px 18px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; outline: none; transition: 0.2s; }
+        .auth-form input:focus { border-color: #0284c7; box-shadow: 0 0 0 3px #bae6fd; }
+        .btn { padding: 12px 24px; border: none; border-radius: 40px; font-size: 1rem; font-weight: 500; cursor: pointer; transition: 0.2s; background: #e2e8f0; color: #1e293b; }
+        .btn-primary { background: #0284c7; color: white; }
+        .btn-primary:hover { background: #0369a1; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-success:hover { background: #059669; }
+        .btn-warning { background: #f59e0b; color: white; }
+        .btn-warning:hover { background: #d97706; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-danger:hover { background: #dc2626; }
+        .btn-sm { padding: 6px 14px; font-size: 0.9rem; }
+        .flex-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+        .user-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .sync-status { display: flex; align-items: center; gap: 8px; background: #f1f5f9; padding: 6px 16px; border-radius: 40px; font-size: 0.9rem; cursor: pointer; }
+        .sync-status.online { color: #10b981; }
+        .sync-status.offline { color: #ef4444; }
+        .sync-status.syncing { color: #f59e0b; }
+        .scanner-container { width: 100%; border-radius: 20px; overflow: hidden; background: #0f172a; margin: 20px 0; position: relative; }
+        #interactive.viewport { position: relative; width: 100%; max-height: 350px; overflow: hidden; }
+        #interactive.viewport video, #interactive.viewport canvas { width: 100%; height: auto; display: block; }
+        .scanner-controls { display: flex; gap: 10px; margin: 10px 0; justify-content: center; }
+        .manual-section { display: flex; gap: 10px; margin: 20px 0; }
+        .manual-section input { flex: 1; padding: 14px 18px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; }
+        .result-card { background: #e6f7ff; padding: 16px; border-radius: 20px; margin: 20px 0; border-left: 6px solid #0284c7; }
+        .carrier-badge { background: #0284c7; color: white; padding: 4px 14px; border-radius: 40px; font-size: 0.85rem; display: inline-block; font-weight: 500; }
+        .pending-badge { background: #f59e0b; color: white; padding: 2px 8px; border-radius: 40px; font-size: 0.7rem; margin-left: 6px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 0.95rem; }
+        th { text-align: left; padding: 12px 8px; background: #f8fafc; color: #475569; font-weight: 500; }
+        td { padding: 12px 8px; border-bottom: 1px solid #e2e8f0; }
+        .delete-btn, .copy-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; padding: 0 6px; transition: 0.2s; }
+        .copy-btn { color: #0284c7; }
+        .copy-btn:hover { color: #0369a1; }
+        .delete-btn { color: #ef4444; }
+        .delete-btn:hover { color: #b91c1c; }
+        .export-btn { background: #0f172a; color: white; }
+        .stats-panel { background: #f8fafc; border-radius: 20px; padding: 16px; margin: 20px 0; display: flex; flex-wrap: wrap; gap: 24px; align-items: center; }
+        .stat-item { display: flex; flex-direction: column; }
+        .stat-label { font-size: 0.85rem; color: #64748b; }
+        .stat-value { font-size: 1.5rem; font-weight: 600; color: #0f172a; }
+        .carrier-stats { display: flex; flex-wrap: wrap; gap: 12px; }
+        .carrier-stat { background: white; padding: 4px 12px; border-radius: 40px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .search-box { flex: 1; min-width: 200px; padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; }
+        .toolbar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 16px 0; }
+        .clear-select { padding: 10px 16px; border: 1px solid #cbd5e1; border-radius: 40px; font-size: 1rem; background: white; }
+        .footer-note { text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 30px; }
+        .error-msg { color: #dc2626; font-size: 0.9rem; margin-top: 8px; }
+        .badge { background: #ef4444; color: white; border-radius: 20px; padding: 2px 8px; font-size: 0.7rem; margin-left: 6px; }
+    </style>
+</head>
+<body>
+<div class="app">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>📦 快递扫码 · 专业版</h1>
+            <div id="syncStatus" class="sync-status online" title="点击立即同步">🟢 在线</div>
+        </div>
+
+        <div id="userHeader" class="user-header">
+            <div id="userInfo"></div>
+            <button id="logoutBtn" class="btn btn-sm" style="display: none;">退出登录</button>
+        </div>
+
+        <!-- 认证区域 -->
+        <div id="authArea" class="auth-container">
+            <div class="tabs">
+                <button id="loginTab" class="tab-btn active">登录</button>
+                <button id="signupTab" class="tab-btn">注册</button>
+            </div>
+            <div id="loginForm" class="auth-form">
+                <input type="email" id="loginEmail" placeholder="电子邮箱" required>
+                <input type="password" id="loginPassword" placeholder="密码" required>
+                <button id="loginBtn" class="btn btn-primary">登录</button>
+                <div id="loginError" class="error-msg"></div>
+            </div>
+            <div id="signupForm" class="auth-form" style="display: none;">
+                <input type="email" id="signupEmail" placeholder="电子邮箱" required>
+                <input type="password" id="signupPassword" placeholder="密码（至少6位）" required>
+                <button id="signupBtn" class="btn btn-primary">注册</button>
+                <div id="signupError" class="error-msg"></div>
+            </div>
+        </div>
+
+        <!-- 主应用区域 -->
+        <div id="mainApp" style="display: none;">
+            <div class="scanner-container">
+                <div id="interactive" class="viewport"></div>
+            </div>
+            <div class="scanner-controls">
+                <button id="pauseScanBtn" class="btn btn-warning">⏸️ 暂停扫码</button>
+                <button id="resumeScanBtn" class="btn btn-success" style="display: none;">▶️ 继续扫码</button>
+            </div>
+            <p class="hint">将快递单条码对准摄像头，或手动输入单号</p>
+
+            <div class="manual-section">
+                <input type="text" id="manualInput" placeholder="手动输入单号">
+                <button id="manualSubmit" class="btn btn-primary">登记</button>
+            </div>
+
+            <div id="currentResult" class="result-card" style="display: none;">
+                <h3>✅ 最新扫描</h3>
+                <p><strong>单号：</strong> <span id="trackingNumber"></span></p>
+                <p><strong>快递公司：</strong> <span id="carrier"></span></p>
+                <p><strong>时间：</strong> <span id="scannedAt"></span></p>
+            </div>
+
+            <!-- 统计面板 -->
+            <div class="stats-panel" id="statsPanel">
+                <div class="stat-item">
+                    <span class="stat-label">总记录数</span>
+                    <span class="stat-value" id="totalCount">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">唯一单号</span>
+                    <span class="stat-value" id="uniqueCount">0</span>
+                </div>
+                <div class="carrier-stats" id="carrierStats"></div>
+            </div>
+
+            <!-- 工具栏：搜索 + 范围清空 -->
+            <div class="toolbar">
+                <input type="text" id="searchInput" class="search-box" placeholder="🔍 搜索单号或快递公司...">
+                <select id="clearRangeSelect" class="clear-select">
+                    <option value="session">本次扫码</option>
+                    <option value="day">最近一天</option>
+                    <option value="week">最近一周</option>
+                    <option value="all">全部</option>
+                </select>
+                <button id="clearRangeBtn" class="btn btn-danger">🗑️ 清空所选范围</button>
+            </div>
+
+            <!-- 数据表格 -->
+            <div style="overflow-x: auto;">
+                <table id="historyTable">
+                    <thead>
+                        <tr>
+                            <th>单号</th>
+                            <th>快递公司</th>
+                            <th>扫描时间</th>
+                            <th>备注</th>
+                            <th style="width:100px">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyBody"></tbody>
+                </table>
+            </div>
+            <p id="noDataMsg" style="color:#94a3b8; text-align:center; padding:30px;">暂无记录</p>
+        </div>
+    </div>
+    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 连续扫码</div>
+</div>
+
+<script>
+    // ================== 配置 ==================
+    const SUPABASE_URL = 'https://vmkpymrujtvguvmzcisc.supabase.co';
+    const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu';
+    const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    const carrierRules = [
+        { name: '顺丰速运', regex: /^SF\d{12}$/i },
+        { name: '圆通速递', regex: /^YT\d{10,12}$/i },
+        { name: '中通快递', regex: /^\d{12}$/ },
+        { name: '申通快递', regex: /^ST\d{10,12}$/i },
+        { name: '韵达快递', regex: /^YD\d{10,12}$/i },
+        { name: '京东物流', regex: /^JD\d{10,12}$/i },
+        { name: '邮政EMS', regex: /^\d{13}$/ },
+        { name: '极兔速递', regex: /^JT\d{10,12}$/i },
+        { name: '未知', regex: /.*/ }
+    ];
+
+    let currentUser = null;
+    let pendingRecords = [];
+    let isOnline = navigator.onLine;
+    let isScanning = false;
+    let lastScannedCode = '';
+    let lastScanTime = 0;
+    let allRecords = [];
+    let sessionStartTime = null; // 记录本次登录时间
+
+    // DOM 元素
+    const syncStatusDiv = document.getElementById('syncStatus');
+    const authArea = document.getElementById('authArea');
+    const mainApp = document.getElementById('mainApp');
+    const userInfoDiv = document.getElementById('userInfo');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const loginTab = document.getElementById('loginTab');
+    const signupTab = document.getElementById('signupTab');
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
+    const loginBtn = document.getElementById('loginBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const loginError = document.getElementById('loginError');
+    const signupError = document.getElementById('signupError');
+    const manualInput = document.getElementById('manualInput');
+    const manualSubmit = document.getElementById('manualSubmit');
+    const currentResult = document.getElementById('currentResult');
+    const trackingSpan = document.getElementById('trackingNumber');
+    const carrierSpan = document.getElementById('carrier');
+    const scannedAtSpan = document.getElementById('scannedAt');
+    const historyBody = document.getElementById('historyBody');
+    const noDataMsg = document.getElementById('noDataMsg');
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const exportXlsxBtn = document.getElementById('exportXlsxBtn');
+    const pauseScanBtn = document.getElementById('pauseScanBtn');
+    const resumeScanBtn = document.getElementById('resumeScanBtn');
+    const searchInput = document.getElementById('searchInput');
+    const clearRangeSelect = document.getElementById('clearRangeSelect');
+    const clearRangeBtn = document.getElementById('clearRangeBtn');
+    const totalCountSpan = document.getElementById('totalCount');
+    const uniqueCountSpan = document.getElementById('uniqueCount');
+    const carrierStatsDiv = document.getElementById('carrierStats');
+
+    // ================== 本地存储 ==================
+    const STORAGE_KEY = 'pending_scans';
+
+    function loadPendingFromStorage() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            try {
+                pendingRecords = JSON.parse(stored);
+            } catch (e) {
+                pendingRecords = [];
+            }
+        } else {
+            pendingRecords = [];
+        }
+    }
+
+    function savePendingToStorage() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingRecords));
+    }
+
+    function addPendingRecord(record) {
+        const localId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        const newRecord = { ...record, localId, pending: true };
+        pendingRecords.unshift(newRecord);
+        savePendingToStorage();
+        updateSyncStatusUI();
+        return newRecord;
+    }
+
+    function removePendingRecord(localId) {
+        pendingRecords = pendingRecords.filter(r => r.localId !== localId);
+        savePendingToStorage();
+        updateSyncStatusUI();
+    }
+
+    // ================== 同步状态 ==================
+    function updateSyncStatusUI() {
+        if (!isOnline) {
+            syncStatusDiv.className = 'sync-status offline';
+            syncStatusDiv.innerHTML = `🔴 离线 <span class="badge">${pendingRecords.length}</span>`;
+        } else {
+            if (pendingRecords.length > 0) {
+                syncStatusDiv.className = 'sync-status syncing';
+                syncStatusDiv.innerHTML = `🟡 待同步 <span class="badge">${pendingRecords.length}</span>`;
+            } else {
+                syncStatusDiv.className = 'sync-status online';
+                syncStatusDiv.innerHTML = `🟢 在线`;
+            }
+        }
+    }
+
+    window.addEventListener('online', () => {
+        isOnline = true;
+        updateSyncStatusUI();
+        syncPendingRecords();
+    });
+    window.addEventListener('offline', () => {
+        isOnline = false;
+        updateSyncStatusUI();
+    });
+
+    async function syncPendingRecords() {
+        if (!isOnline || !currentUser || pendingRecords.length === 0) return;
+        syncStatusDiv.className = 'sync-status syncing';
+        syncStatusDiv.innerHTML = `🟡 同步中...`;
+
+        const failedLocalIds = [];
+        for (const record of pendingRecords) {
+            try {
+                const { error } = await sbClient
+                    .from('scans')
+                    .insert([{
+                        tracking_number: record.tracking_number,
+                        carrier: record.carrier,
+                        notes: record.notes || '',
+                        scanned_at: record.scanned_at,
+                        user_id: currentUser.id
+                    }]);
+                if (error) {
+                    console.warn('同步失败:', record, error);
+                    failedLocalIds.push(record.localId);
+                } else {
+                    pendingRecords = pendingRecords.filter(r => r.localId !== record.localId);
+                }
+            } catch (err) {
+                console.error('同步异常:', err);
+                failedLocalIds.push(record.localId);
+            }
+        }
+        savePendingToStorage();
+        updateSyncStatusUI();
+        await loadMergedHistory();
+        if (failedLocalIds.length > 0) {
+            alert(`部分记录同步失败，将在网络稳定后重试。`);
+        }
+    }
+
+    // ================== 数据加载与合并 ==================
+    async function loadMergedHistory() {
+        if (!currentUser) return;
+        let cloudData = [];
+        try {
+            const { data, error } = await sbClient
+                .from('scans')
+                .select('*')
+                .eq('user_id', currentUser.id)
+                .order('scanned_at', { ascending: false });
+            if (error) throw error;
+            cloudData = data || [];
+        } catch (err) {
+            console.error('加载云端数据失败:', err);
+        }
+
+        const cloudMapped = cloudData.map(item => ({
+            ...item,
+            localId: null,
+            pending: false
+        }));
+
+        allRecords = [...pendingRecords, ...cloudMapped];
+        allRecords.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+
+        renderStats(allRecords);
+        applyFilter();
+    }
+
+    // 统计
+    function renderStats(records) {
+        totalCountSpan.innerText = records.length;
+        const uniqueNumbers = new Set(records.map(r => r.tracking_number));
+        uniqueCountSpan.innerText = uniqueNumbers.size;
+
+        const carrierCount = {};
+        records.forEach(r => {
+            const c = r.carrier || '未知';
+            carrierCount[c] = (carrierCount[c] || 0) + 1;
+        });
+
+        carrierStatsDiv.innerHTML = Object.entries(carrierCount).map(([name, count]) =>
+            `<span class="carrier-stat">${name}: ${count}</span>`
+        ).join('');
+    }
+
+    // 过滤与渲染
+    function applyFilter() {
+        const keyword = searchInput.value.trim().toLowerCase();
+        let filtered = allRecords;
+        if (keyword) {
+            filtered = allRecords.filter(r =>
+                r.tracking_number.toLowerCase().includes(keyword) ||
+                (r.carrier && r.carrier.toLowerCase().includes(keyword))
+            );
+        }
+        renderTable(filtered);
+    }
+
+    function renderTable(records) {
+        if (records.length === 0) {
+            noDataMsg.style.display = 'block';
+            historyBody.innerHTML = '';
+            return;
+        }
+        noDataMsg.style.display = 'none';
+        historyBody.innerHTML = records.map(rec => {
+            const pendingTag = rec.pending ? '<span class="pending-badge">待同步</span>' : '';
+            return `
+            <tr>
+                <td>${escapeHtml(rec.tracking_number)} ${pendingTag}</td>
+                <td><span class="carrier-badge">${escapeHtml(rec.carrier || '未知')}</span></td>
+                <td>${new Date(rec.scanned_at).toLocaleString()}</td>
+                <td>${escapeHtml(rec.notes || '')}</td>
+                <td>
+                    <button class="copy-btn" data-code="${escapeHtml(rec.tracking_number)}" title="复制单号">📋</button>
+                    <button class="delete-btn" data-localid="${rec.localId || ''}" data-cloudid="${rec.id || ''}" title="删除">🗑️</button>
+                </td>
+            </tr>
+        `}).join('');
+
+        // 绑定复制事件
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const code = e.target.dataset.code;
+                navigator.clipboard.writeText(code).then(() => {
+                    alert('单号已复制');
+                }).catch(() => {
+                    alert('复制失败');
+                });
+            });
+        });
+
+        // 绑定删除事件
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const localId = e.target.dataset.localid;
+                const cloudId = e.target.dataset.cloudid;
+                if (confirm('确定删除这条记录吗？')) {
+                    await deleteRecord(localId, cloudId);
+                }
+            });
+        });
+    }
+
+    async function deleteRecord(localId, cloudId) {
+        if (!currentUser) return;
+
+        if (localId) {
+            pendingRecords = pendingRecords.filter(r => r.localId !== localId);
+            savePendingToStorage();
+        }
+
+        if (cloudId) {
+            try {
+                const { error } = await sbClient
+                    .from('scans')
+                    .delete()
+                    .eq('id', cloudId)
+                    .eq('user_id', currentUser.id);
+                if (error) throw error;
+            } catch (err) {
+                console.error('删除云端记录失败:', err);
+                alert('删除失败：' + err.message);
+                return;
+            }
+        }
+
+        await loadMergedHistory();
+        updateSyncStatusUI();
+    }
+
+    // ================== 按范围删除 ==================
+    async function clearRecordsByRange() {
+        const range = clearRangeSelect.value;
+        let startTime = null;
+        let rangeDesc = '';
+
+        if (range === 'session') {
+            if (!sessionStartTime) {
+                alert('无法确定本次登录时间，请重新登录。');
+                return;
+            }
+            startTime = sessionStartTime;
+            rangeDesc = '本次扫码';
+        } else if (range === 'day') {
+            startTime = new Date(Date.now() - 24 * 60 * 60 * 1000);
+            rangeDesc = '最近一天';
+        } else if (range === 'week') {
+            startTime = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+            rangeDesc = '最近一周';
+        } else if (range === 'all') {
+            startTime = null; // 表示全部
+            rangeDesc = '全部';
+        }
+
+        // 计算要删除的记录数量（用于确认）
+        let toDelete = [];
+        if (startTime) {
+            toDelete = allRecords.filter(r => new Date(r.scanned_at) >= startTime);
+        } else {
+            toDelete = allRecords;
+        }
+
+        if (toDelete.length === 0) {
+            alert('所选范围内没有记录');
+            return;
+        }
+
+        if (!confirm(`确定删除 ${rangeDesc} 的 ${toDelete.length} 条记录吗？`)) {
+            return;
+        }
+
+        // 删除云端记录
+        if (isOnline && currentUser) {
+            try {
+                let query = sbClient
+                    .from('scans')
+                    .delete()
+                    .eq('user_id', currentUser.id);
+                if (startTime) {
+                    // 注意：scanned_at 是带时区的，使用 ISO 字符串比较
+                    query = query.gte('scanned_at', startTime.toISOString());
+                }
+                const { error } = await query;
+                if (error) throw error;
+            } catch (err) {
+                console.error('批量删除云端失败:', err);
+                alert('删除云端记录失败：' + err.message);
+                return;
+            }
+        }
+
+        // 删除本地待同步记录
+        if (startTime) {
+            pendingRecords = pendingRecords.filter(r => new Date(r.scanned_at) < startTime);
+        } else {
+            pendingRecords = []; // 全部
+        }
+        savePendingToStorage();
+
+        // 重新加载数据
+        await loadMergedHistory();
+        updateSyncStatusUI();
+    }
+
+    // ================== 辅助函数 ==================
+    function escapeHtml(unsafe) {
+        return unsafe.replace(/[&<>"']/g, function(m) {
+            if(m === '&') return '&amp;';
+            if(m === '<') return '&lt;';
+            if(m === '>') return '&gt;';
+            if(m === '"') return '&quot;';
+            if(m === "'") return '&#039;';
+            return m;
+        });
+    }
+
+    function detectCarrier(trackingNumber) {
+        for (let rule of carrierRules) {
+            if (rule.regex.test(trackingNumber)) return rule.name;
+        }
+        return '未知';
+    }
+
+    async function saveScan(trackingNumber, carrier, notes = '') {
+        if (!currentUser) return false;
+
+        const record = {
+            tracking_number: trackingNumber,
+            carrier: carrier,
+            notes: notes,
+            scanned_at: new Date().toISOString()
+        };
+
+        if (isOnline) {
+            try {
+                const { error } = await sbClient
+                    .from('scans')
+                    .insert([{
+                        ...record,
+                        user_id: currentUser.id
+                    }]);
+                if (error) throw error;
+                await loadMergedHistory();
+                return true;
+            } catch (err) {
+                console.warn('云端保存失败，转本地待同步:', err);
+                addPendingRecord(record);
+                await loadMergedHistory();
+                return true;
+            }
+        } else {
+            addPendingRecord(record);
+            await loadMergedHistory();
+            return true;
+        }
+    }
+
+    async function handleTrackingNumber(trackingNumber) {
+        const carrier = detectCarrier(trackingNumber);
+        currentResult.style.display = 'block';
+        trackingSpan.innerText = trackingNumber;
+        carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
+        scannedAtSpan.innerText = new Date().toLocaleString();
+        await saveScan(trackingNumber, carrier);
+    }
+
+    // ================== 扫码初始化 ==================
+    let quaggaInitialized = false;
+
+    function initScanner() {
+        if (quaggaInitialized) return;
+        Quagga.init({
+            inputStream: {
+                name: "Live",
+                type: "LiveStream",
+                target: document.querySelector('#interactive'),
+                constraints: { width: 640, height: 480, facingMode: "environment" }
+            },
+            decoder: { readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader", "codabar_reader", "upc_reader", "i2of5_reader"] }
+        }, function(err) {
+            if (err) {
+                console.error('扫码器初始化失败:', err);
+                alert('无法启动摄像头，请检查权限。你可以手动输入单号。');
+                return;
+            }
+            Quagga.start();
+            isScanning = true;
+            quaggaInitialized = true;
+            updateScanButtons();
+        });
+
+        Quagga.onDetected(function(result) {
+            if (!isScanning || !currentUser) return;
+            const code = result.codeResult.code;
+            if (!code) return;
+            const now = Date.now();
+            if (code === lastScannedCode && (now - lastScanTime) < 2000) {
+                return;
+            }
+            lastScannedCode = code;
+            lastScanTime = now;
+            handleTrackingNumber(code);
+        });
+    }
+
+    function stopScanner() {
+        if (quaggaInitialized && isScanning) {
+            Quagga.stop();
+            isScanning = false;
+            updateScanButtons();
+        }
+    }
+
+    function resumeScanner() {
+        if (quaggaInitialized && !isScanning) {
+            Quagga.start();
+            isScanning = true;
+            updateScanButtons();
+        }
+    }
+
+    function updateScanButtons() {
+        if (isScanning) {
+            pauseScanBtn.style.display = 'inline-block';
+            resumeScanBtn.style.display = 'none';
+        } else {
+            pauseScanBtn.style.display = 'none';
+            resumeScanBtn.style.display = 'inline-block';
+        }
+    }
+
+    // ================== 用户认证 ==================
+    function showAuth() {
+        authArea.style.display = 'block';
+        mainApp.style.display = 'none';
+        logoutBtn.style.display = 'none';
+        if (quaggaInitialized) {
+            Quagga.stop();
+            isScanning = false;
+            quaggaInitialized = false;
+        }
+    }
+
+    function showApp(user) {
+        authArea.style.display = 'none';
+        mainApp.style.display = 'block';
+        logoutBtn.style.display = 'inline-block';
+        userInfoDiv.innerText = `👤 ${user.email}`;
+        sessionStartTime = new Date(); // 记录登录时间
+        loadPendingFromStorage();
+        initScanner();
+        loadMergedHistory();
+        updateSyncStatusUI();
+    }
+
+    sbClient.auth.onAuthStateChange((event, session) => {
+        if (session) {
+            currentUser = session.user;
+            showApp(currentUser);
+        } else {
+            currentUser = null;
+            showAuth();
+        }
+    });
+
+    sbClient.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+            currentUser = session.user;
+            showApp(currentUser);
+        }
+    });
+
+    // ================== 事件绑定 ==================
+    loginTab.addEventListener('click', () => {
+        loginTab.classList.add('active');
+        signupTab.classList.remove('active');
+        loginForm.style.display = 'flex';
+        signupForm.style.display = 'none';
+    });
+    signupTab.addEventListener('click', () => {
+        signupTab.classList.add('active');
+        loginTab.classList.remove('active');
+        signupForm.style.display = 'flex';
+        loginForm.style.display = 'none';
+    });
+
+    loginBtn.addEventListener('click', async () => {
+        const email = document.getElementById('loginEmail').value.trim();
+        const password = document.getElementById('loginPassword').value;
+        loginError.innerText = '';
+        try {
+            const { error } = await sbClient.auth.signInWithPassword({ email, password });
+            if (error) throw error;
+        } catch (err) {
+            loginError.innerText = err.message;
+        }
+    });
+
+    signupBtn.addEventListener('click', async () => {
+        const email = document.getElementById('signupEmail').value.trim();
+        const password = document.getElementById('signupPassword').value;
+        signupError.innerText = '';
+        try {
+            const { error } = await sbClient.auth.signUp({ email, password });
+            if (error) throw error;
+            alert('注册成功！请登录。');
+            loginTab.click();
+        } catch (err) {
+            signupError.innerText = err.message;
+        }
+    });
+
+    logoutBtn.addEventListener('click', async () => {
+        stopScanner();
+        await sbClient.auth.signOut();
+    });
+
+    manualSubmit.addEventListener('click', () => {
+        const val = manualInput.value.trim();
+        if (!val) return alert('请输入单号');
+        handleTrackingNumber(val);
+        manualInput.value = '';
+    });
+    manualInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') manualSubmit.click();
+    });
+
+    pauseScanBtn.addEventListener('click', stopScanner);
+    resumeScanBtn.addEventListener('click', resumeScanner);
+
+    searchInput.addEventListener('input', applyFilter);
+
+    clearRangeBtn.addEventListener('click', clearRecordsByRange);
+
+    syncStatusDiv.addEventListener('click', () => {
+        if (isOnline && pendingRecords.length > 0) {
+            syncPendingRecords();
+        } else if (!isOnline) {
+            alert('当前处于离线状态，无法同步。请连接网络后重试。');
+        } else {
+            alert('所有记录已同步');
+        }
+    });
+
+    // 导出功能（略，与之前相同）
+    exportCsvBtn.addEventListener('click', async () => {
+        if (!currentUser) return;
+        let cloudData = [];
+        try {
+            const { data } = await sbClient
+                .from('scans')
+                .select('*')
+                .eq('user_id', currentUser.id);
+            cloudData = data || [];
+        } catch (e) {}
+        const all = [...pendingRecords, ...cloudData.map(d => ({ ...d, pending: false }))];
+        all.sort((a,b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+        exportCSV(all);
+    });
+
+    exportXlsxBtn.addEventListener('click', async () => {
+        if (!currentUser) return;
+        let cloudData = [];
+        try {
+            const { data } = await sbClient
+                .from('scans')
+                .select('*')
+                .eq('user_id', currentUser.id);
+            cloudData = data || [];
+        } catch (e) {}
+        const all = [...pendingRecords, ...cloudData.map(d => ({ ...d, pending: false }))];
+        all.sort((a,b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+        exportXLSX(all);
+    });
+
+    function exportCSV(records) {
+        if (!records || records.length === 0) {
+            alert('暂无数据可导出');
+            return;
+        }
+        const headers = ['单号', '快递公司', '扫描时间', '备注', '状态'];
+        const rows = records.map(row => [
+            row.tracking_number,
+            row.carrier || '',
+            new Date(row.scanned_at).toLocaleString(),
+            row.notes || '',
+            row.pending ? '待同步' : '已同步'
+        ]);
+        const csvContent = [headers, ...rows]
+            .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+            .join('\n');
+
+        const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `快递记录_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    }
+
+    function exportXLSX(records) {
+        if (!records || records.length === 0) {
+            alert('暂无数据可导出');
+            return;
+        }
+        const data = records.map(row => ({
+            '单号': row.tracking_number,
+            '快递公司': row.carrier || '',
+            '扫描时间': new Date(row.scanned_at).toLocaleString(),
+            '备注': row.notes || '',
+            '状态': row.pending ? '待同步' : '已同步'
+        }));
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, '扫描记录');
+        XLSX.writeFile(workbook, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+    // 初始化加载本地存储
+    loadPendingFromStorage();
+</script>
+</body>
+</html>
