@@ -92,6 +92,10 @@
         .pagination button { padding: 8px 16px; border: none; border-radius: 40px; background: #e2e8f0; cursor: pointer; }
         .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
         .pagination span { font-size: 0.95rem; color: #475569; }
+        /* 数据源切换按钮 */
+        .data-source-switch { display: flex; gap: 8px; margin-left: 10px; }
+        .data-source-switch button { padding: 8px 16px; border: none; border-radius: 40px; background: #e2e8f0; cursor: pointer; }
+        .data-source-switch button.active { background: #0284c7; color: white; }
         /* 模态框 */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 2000; }
         .modal.show { display: flex; }
@@ -187,7 +191,7 @@
                 <div class="carrier-stats" id="carrierStats"></div>
             </div>
 
-            <!-- 工具栏：搜索 + 范围清空 + 导出按钮 -->
+            <!-- 工具栏：搜索 + 范围清空 + 导出 + 数据源切换 -->
             <div class="toolbar">
                 <input type="text" id="searchInput" class="search-box" placeholder="🔍 搜索单号或快递公司...">
                 <select id="clearRangeSelect" class="clear-select">
@@ -197,6 +201,10 @@
                     <option value="all">全部</option>
                 </select>
                 <button id="clearRangeBtn" class="btn btn-danger">🗑️ 清空所选范围</button>
+                <div class="data-source-switch">
+                    <button id="dataSourceAll" class="active">全部数据</button>
+                    <button id="dataSourceCloud">云端数据</button>
+                </div>
                 <div style="display: flex; gap: 8px; margin-left: auto;">
                     <button id="exportCsvBtn" class="btn export-btn">📥 CSV</button>
                     <button id="exportXlsxBtn" class="btn btn-success">📊 XLSX</button>
@@ -272,7 +280,8 @@
     let isScanning = false;
     let lastScannedCode = '';
     let lastScanTime = 0;
-    let allRecords = [];
+    let allRecords = [];          // 合并后的所有记录（用于统计，但实际显示由数据源决定）
+    let cloudData = [];            // 纯云端数据
     let sessionStartTime = null;
 
     // 语音相关
@@ -288,8 +297,11 @@
 
     // 分页相关
     let currentPage = 1;
-    const pageSize = 10; // 改为每页10条
-    let filteredRecords = [];
+    const pageSize = 10;
+    let filteredRecords = [];      // 当前显示的记录（经过数据源和搜索过滤）
+
+    // 数据源模式：'all' 或 'cloud'
+    let dataSourceMode = 'all';
 
     // DOM 元素
     const syncStatusDiv = document.getElementById('syncStatus');
@@ -337,6 +349,8 @@
     const prevPageBtn = document.getElementById('prevPageBtn');
     const nextPageBtn = document.getElementById('nextPageBtn');
     const pageInfo = document.getElementById('pageInfo');
+    const dataSourceAll = document.getElementById('dataSourceAll');
+    const dataSourceCloud = document.getElementById('dataSourceCloud');
 
     // ================== 声音开关 ==================
     function loadSoundPreference() {
@@ -598,7 +612,7 @@
     // ================== 数据加载与合并 ==================
     async function loadMergedHistory() {
         if (!currentUser) return;
-        let cloudData = [];
+        let cloudDataRaw = [];
         try {
             const { data, error } = await sbClient
                 .from('scans')
@@ -606,16 +620,20 @@
                 .eq('user_id', currentUser.id)
                 .order('scanned_at', { ascending: false });
             if (error) throw error;
-            cloudData = data || [];
+            cloudDataRaw = data || [];
         } catch (err) {
             console.error('加载云端数据失败:', err);
         }
 
-        const cloudMapped = cloudData.map(item => ({ ...item, localId: null, pending: false }));
-        allRecords = [...pendingRecords, ...cloudMapped];
+        cloudData = cloudDataRaw.map(item => ({ ...item, localId: null, pending: false }));
+        allRecords = [...pendingRecords, ...cloudData];
         allRecords.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+        
+        // 更新统计（基于全部数据）
         renderStats(allRecords);
-        applyFilter();
+        
+        // 应用当前数据源和搜索
+        applyDataSource();
     }
 
     function renderStats(records) {
@@ -632,18 +650,31 @@
         ).join('');
     }
 
-    function applyFilter() {
+    // 根据当前数据源和搜索词更新 filteredRecords
+    function applyDataSource() {
+        let baseRecords = [];
+        if (dataSourceMode === 'all') {
+            baseRecords = allRecords;
+        } else {
+            baseRecords = cloudData; // 仅云端数据
+        }
+
         const keyword = searchInput.value.trim().toLowerCase();
         if (keyword) {
-            filteredRecords = allRecords.filter(r =>
+            filteredRecords = baseRecords.filter(r =>
                 r.tracking_number.toLowerCase().includes(keyword) ||
                 (r.carrier && r.carrier.toLowerCase().includes(keyword))
             );
         } else {
-            filteredRecords = [...allRecords];
+            filteredRecords = [...baseRecords];
         }
         currentPage = 1;
         renderPage();
+    }
+
+    // 包装函数，供搜索输入调用
+    function applyFilter() {
+        applyDataSource();
     }
 
     function renderPage() {
@@ -768,6 +799,24 @@
         await loadMergedHistory();
         updateSyncStatusUI();
     }
+
+    // ================== 数据源切换事件 ==================
+    function setDataSource(mode) {
+        dataSourceMode = mode;
+        // 更新按钮状态
+        if (mode === 'all') {
+            dataSourceAll.classList.add('active');
+            dataSourceCloud.classList.remove('active');
+        } else {
+            dataSourceCloud.classList.add('active');
+            dataSourceAll.classList.remove('active');
+        }
+        // 重新应用数据源和搜索
+        applyDataSource();
+    }
+
+    dataSourceAll.addEventListener('click', () => setDataSource('all'));
+    dataSourceCloud.addEventListener('click', () => setDataSource('cloud'));
 
     // ================== 辅助函数 ==================
     function escapeHtml(unsafe) {
@@ -930,6 +979,7 @@
         updateScanButtons();
         loadNoteOptions();
         noteLocked = false; lockedNote = ''; noteInput.value = ''; updateLockUI();
+        // 默认数据源为 all，按钮状态已在 HTML 中设置
     }
 
     sbClient.auth.onAuthStateChange((event, session) => {
@@ -996,18 +1046,18 @@
 
     exportCsvBtn.addEventListener('click', async () => {
         if (!currentUser) return;
-        let cloudData = [];
-        try { const { data } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id); cloudData = data || []; } catch(e) {}
-        const all = [...pendingRecords, ...cloudData.map(d => ({ ...d, pending: false }))];
+        let cloudDataExport = [];
+        try { const { data } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id); cloudDataExport = data || []; } catch(e) {}
+        const all = [...pendingRecords, ...cloudDataExport.map(d => ({ ...d, pending: false }))];
         all.sort((a,b) => new Date(b.scanned_at) - new Date(a.scanned_at));
         exportCSV(all);
     });
 
     exportXlsxBtn.addEventListener('click', async () => {
         if (!currentUser) return;
-        let cloudData = [];
-        try { const { data } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id); cloudData = data || []; } catch(e) {}
-        const all = [...pendingRecords, ...cloudData.map(d => ({ ...d, pending: false }))];
+        let cloudDataExport = [];
+        try { const { data } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id); cloudDataExport = data || []; } catch(e) {}
+        const all = [...pendingRecords, ...cloudDataExport.map(d => ({ ...d, pending: false }))];
         all.sort((a,b) => new Date(b.scanned_at) - new Date(a.scanned_at));
         exportXLSX(all);
     });
