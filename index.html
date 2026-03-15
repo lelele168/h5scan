@@ -167,7 +167,7 @@
                     <option value="all">全部</option>
                 </select>
                 <button id="clearRangeBtn" class="btn btn-danger">🗑️ 清空所选范围</button>
-                <!-- 导出按钮组 -->
+                <!-- 导出按钮组，靠右 -->
                 <div style="display: flex; gap: 8px; margin-left: auto;">
                     <button id="exportCsvBtn" class="btn export-btn">📥 CSV</button>
                     <button id="exportXlsxBtn" class="btn btn-success">📊 XLSX</button>
@@ -834,16 +834,25 @@
         });
     }
 
-    // 启动扫码（确保先停止可能残留的流，再启动）
+    // 启动扫码：确保先停止可能残留的流，再启动
     function startScanner() {
         if (!currentUser) return;
 
         const doStart = () => {
-            // 先确保 Quagga 停止（避免冲突）
-            try { Quagga.stop(); } catch (e) {}
-            Quagga.start();
-            isScanning = true;
-            updateScanButtons();
+            try {
+                // 如果正在扫描，先停止（避免冲突）
+                if (isScanning) {
+                    Quagga.stop();
+                    isScanning = false;
+                }
+                Quagga.start();
+                isScanning = true;
+                updateScanButtons();
+                showToast('扫码已启动', 'success');
+            } catch (err) {
+                console.error('启动扫码失败', err);
+                showToast('启动摄像头失败，请重试', 'error');
+            }
         };
 
         if (!quaggaInitialized) {
@@ -862,6 +871,7 @@
             Quagga.stop();
             isScanning = false;
             updateScanButtons();
+            showToast('扫码已暂停', 'warning');
         }
     }
 
