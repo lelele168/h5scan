@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>快递扫码系统 · 专业版</title>
+    <title>快递扫码系统 · 语音版</title>
     <!-- QuaggaJS 扫码库 -->
     <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <!-- Supabase JS 客户端 -->
@@ -76,19 +76,20 @@
         .footer-note { text-align: center; color: #94a3b8; font-size: 0.85rem; margin-top: 30px; }
         .error-msg { color: #dc2626; font-size: 0.9rem; margin-top: 8px; }
         .badge { background: #ef4444; color: white; border-radius: 20px; padding: 2px 8px; font-size: 0.7rem; margin-left: 6px; }
-        .audio-tip { text-align: center; color: #0284c7; font-size: 0.8rem; margin-top: 8px; cursor: pointer; }
         .toast-message { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 10px 24px; border-radius: 40px; font-size: 1rem; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.15); transition: opacity 0.3s; opacity: 0; pointer-events: none; }
         .toast-message.show { opacity: 1; }
         .toast-message.success { background: #10b981; }
         .toast-message.error { background: #ef4444; }
         .toast-message.warning { background: #f59e0b; }
+        .scan-toast { position: fixed; top: 80px; left: 50%; transform: translateX(-50%); background: #1e293b; color: white; padding: 12px 24px; border-radius: 40px; font-size: 1.2rem; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: opacity 0.3s; opacity: 0; pointer-events: none; white-space: nowrap; max-width: 80%; overflow: hidden; text-overflow: ellipsis; }
+        .scan-toast.show { opacity: 1; }
     </style>
 </head>
 <body>
 <div class="app">
     <div class="card">
         <div class="header-row">
-            <h1>📦 快递扫码 · 智能识别版</h1>
+            <h1>📦 快递扫码 · 语音版</h1>
             <div class="status-bar">
                 <button id="soundToggleBtn" class="sound-toggle on" title="声音提醒">🔊</button>
                 <div id="syncStatus" class="sync-status online" title="点击立即同步">🟢 在线</div>
@@ -167,7 +168,6 @@
                     <option value="all">全部</option>
                 </select>
                 <button id="clearRangeBtn" class="btn btn-danger">🗑️ 清空所选范围</button>
-                <!-- 导出按钮组，靠右 -->
                 <div style="display: flex; gap: 8px; margin-left: auto;">
                     <button id="exportCsvBtn" class="btn export-btn">📥 CSV</button>
                     <button id="exportXlsxBtn" class="btn btn-success">📊 XLSX</button>
@@ -190,14 +190,15 @@
                 </table>
             </div>
             <p id="noDataMsg" style="color:#94a3b8; text-align:center; padding:30px;">暂无记录</p>
-            <div class="audio-tip" id="audioTip">🔊 点击页面任意位置以启用声音提示</div>
         </div>
     </div>
-    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 基于实际数据优化识别</div>
+    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 语音提示</div>
 </div>
 
-<!-- 全局 Toast 提示 -->
+<!-- 全局 Toast 提示（用于一般信息） -->
 <div id="toast" class="toast-message"></div>
+<!-- 扫码单号临时显示 -->
+<div id="scanToast" class="scan-toast"></div>
 
 <script>
     // ================== 配置 ==================
@@ -205,7 +206,7 @@
     const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu';
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // ================== 快递公司识别规则（基于实际数据优化）==================
+    // 快递公司识别规则（基于实际数据优化）
     const carrierRules = [
         { name: '顺丰快递', regex: /^SF\d{13}$/i },
         { name: '圆通快递', regex: /^YT\d{13}$/i },
@@ -226,10 +227,9 @@
     let allRecords = [];
     let sessionStartTime = null;
 
-    // 音频相关
-    let audioCtx = null;
-    let audioEnabled = false;
-    let soundEnabled = true;
+    // 语音相关
+    let speechEnabled = true;           // 是否朗读（跟随声音开关）
+    let soundEnabled = true;            // 用户偏好：是否播放声音/震动（默认开启）
 
     // DOM 元素
     const syncStatusDiv = document.getElementById('syncStatus');
@@ -264,9 +264,9 @@
     const totalCountSpan = document.getElementById('totalCount');
     const uniqueCountSpan = document.getElementById('uniqueCount');
     const carrierStatsDiv = document.getElementById('carrierStats');
-    const audioTip = document.getElementById('audioTip');
     const toast = document.getElementById('toast');
     const soundToggleBtn = document.getElementById('soundToggleBtn');
+    const scanToast = document.getElementById('scanToast');
 
     // ================== 声音开关 ==================
     function loadSoundPreference() {
@@ -281,6 +281,7 @@
     }
     function toggleSound() {
         soundEnabled = !soundEnabled;
+        speechEnabled = soundEnabled;   // 语音跟随声音开关
         saveSoundPreference();
         updateSoundButton();
         showToast(soundEnabled ? '声音提醒已开启' : '声音提醒已关闭', 'success');
@@ -296,84 +297,58 @@
     }
     soundToggleBtn.addEventListener('click', toggleSound);
 
-    // ================== 音频与震动 ==================
-    function initAudio() {
-        if (audioCtx) return;
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const enableAudio = () => {
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume().then(() => {
-                    audioEnabled = true;
-                    audioTip.style.display = 'none';
-                }).catch(e => console.warn('音频激活失败', e));
-            } else {
-                audioEnabled = true;
-                audioTip.style.display = 'none';
-            }
-            document.removeEventListener('click', enableAudio);
-            document.removeEventListener('touchstart', enableAudio);
-        };
-        document.addEventListener('click', enableAudio);
-        document.addEventListener('touchstart', enableAudio);
-    }
-
-    async function ensureAudio() {
-        if (!audioCtx) return false;
-        if (audioCtx.state === 'suspended') {
-            try {
-                await audioCtx.resume();
-                audioEnabled = true;
-                audioTip.style.display = 'none';
-                return true;
-            } catch (e) {
-                console.warn('恢复音频失败', e);
-                return false;
-            }
+    // ================== 语音朗读 ==================
+    function speak(text) {
+        if (!speechEnabled) return;
+        if (!window.speechSynthesis) {
+            console.warn('浏览器不支持语音合成');
+            return;
         }
-        return true;
-    }
-
-    async function playBeep(type) {
-        if (!soundEnabled) return;
-        if (!audioCtx) return;
-        await ensureAudio();
-        if (audioCtx.state !== 'running') return;
-        const now = audioCtx.currentTime;
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        if (type === 'success') {
-            osc.frequency.value = 880;
-            gain.gain.setValueAtTime(0.1, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
-            osc.start(now);
-            osc.stop(now + 0.1);
-        } else {
-            osc.frequency.value = 440;
-            gain.gain.setValueAtTime(0.1, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
-            osc.start(now);
-            osc.stop(now + 0.2);
+        // 取消任何正在进行的朗读，避免重叠
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 0.9;          // 语速稍慢
+        utterance.pitch = 1.2;          // 音调稍高，更像女声（取决于具体语音）
+        utterance.volume = 1;
+        // 尝试选择女性声音（如果有）
+        const voices = window.speechSynthesis.getVoices();
+        const femaleVoice = voices.find(voice => voice.lang.includes('zh') && voice.name.includes('Female'));
+        if (femaleVoice) {
+            utterance.voice = femaleVoice;
         }
+        window.speechSynthesis.speak(utterance);
     }
 
+    // ================== 震动 ==================
     function vibrate(type) {
         if (!soundEnabled) return;
         if (!navigator.vibrate) return;
         if (type === 'success') {
             navigator.vibrate(50);
+        } else if (type === 'repeat') {
+            navigator.vibrate(100);
         } else {
             navigator.vibrate([100, 50, 100]);
         }
     }
 
+    // 显示普通 Toast 消息
     function showToast(message, type = 'success', duration = 2000) {
         toast.className = `toast-message show ${type}`;
         toast.textContent = message;
         setTimeout(() => {
             toast.classList.remove('show');
         }, duration);
+    }
+
+    // 显示扫码单号临时提示
+    function showScanToast(code) {
+        scanToast.className = 'scan-toast show';
+        scanToast.textContent = `📦 ${code}`;
+        setTimeout(() => {
+            scanToast.classList.remove('show');
+        }, 2000);
     }
 
     // ================== 本地存储 ==================
@@ -730,27 +705,53 @@
         }
     }
 
+    // ================== 处理扫码结果（语音+临时显示）==================
     async function handleTrackingNumber(trackingNumber) {
-        if (soundEnabled) await ensureAudio();
+        // 防重判断（5秒内相同单号不处理）
+        const now = Date.now();
+        if (trackingNumber === lastScannedCode && (now - lastScanTime) < 5000) {
+            // 重复扫码，播放语音“重复”
+            speak('重复');
+            vibrate('repeat');
+            showToast('⚠️ 5秒内重复扫码，已忽略', 'warning');
+            return;
+        }
+
+        // 更新最后扫码记录（用于防重）
+        lastScannedCode = trackingNumber;
+        lastScanTime = now;
 
         const carrier = detectCarrier(trackingNumber);
         
+        // 无效条码处理
         if (carrier === null) {
-            playBeep('error');
+            speak('错误');
             vibrate('error');
             showToast('❌ 无效的快递单号', 'error');
             currentResult.style.display = 'none';
             return;
         }
 
+        // 查找上次扫描时间（用于重复提示）
         const lastTime = findLastScanTime(trackingNumber);
         const isDuplicate = lastTime !== null;
         
+        // 保存记录
         await saveScan(trackingNumber, carrier);
         
-        playBeep('success');
-        vibrate('success');
+        // 播放语音和震动
+        if (isDuplicate) {
+            speak('重复');       // 重复时也朗读“重复”，但保存了记录
+            vibrate('repeat');
+        } else {
+            speak('成功');
+            vibrate('success');
+        }
 
+        // 显示临时单号提示
+        showScanToast(trackingNumber);
+
+        // 更新下方结果卡片
         currentResult.style.display = 'block';
         trackingSpan.innerText = trackingNumber;
         carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
@@ -765,7 +766,7 @@
         }
     }
 
-    // ================== 扫码初始化（修复暂停后重新开始）==================
+    // ================== 扫码初始化 ==================
     let quaggaInitialized = false;
     let quaggaInitPending = false;
 
@@ -810,18 +811,15 @@
     function startScanner() {
         if (!currentUser) return;
 
-        // 无论当前状态如何，先尝试停止任何正在运行的流
         try {
             Quagga.stop();
         } catch (e) {}
 
-        // 重置初始化标志，强制重新初始化
         quaggaInitialized = false;
         quaggaInitPending = false;
 
         initScanner((success) => {
             if (success) {
-                // 短暂延迟后启动，确保流准备就绪
                 setTimeout(() => {
                     Quagga.start();
                     isScanning = true;
@@ -853,17 +851,10 @@
         }
     }
 
-    // 绑定扫码检测事件（只绑定一次）
     Quagga.onDetected(function(result) {
         if (!isScanning || !currentUser) return;
         const code = result.codeResult.code;
         if (!code) return;
-        const now = Date.now();
-        if (code === lastScannedCode && (now - lastScanTime) < 2000) {
-            return;
-        }
-        lastScannedCode = code;
-        lastScanTime = now;
         handleTrackingNumber(code);
     });
 
@@ -887,7 +878,6 @@
         loadPendingFromStorage();
         loadMergedHistory();
         updateSyncStatusUI();
-        initAudio();
         updateScanButtons();
     }
 
@@ -1059,7 +1049,6 @@
     // 初始化
     loadPendingFromStorage();
     loadSoundPreference();
-    initAudio();
 </script>
 </body>
 </html>
