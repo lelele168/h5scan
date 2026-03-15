@@ -688,7 +688,7 @@
     // 所有原始记录（用于分组）
     let allRecords = [];          // 本地待同步 + 云端已同步（合并后）
     let cloudData = [];           // 纯云端数据
-    let sessionStartTime = null;
+    let sessionStartTime = null;  // 本次登录时间
     let cloudDataLoaded = false;  // 云端数据是否已加载
 
     // 语音相关
@@ -1191,14 +1191,20 @@
     // ================== 更新显示 ==================
     function applyDataSource() {
         let baseRecords = [];
+
+        // 构建原始数据池（pending + cloud）
+        const combined = [...pendingRecords];
+        if (cloudDataLoaded) {
+            combined.push(...cloudData);
+        }
+
         if (dataSourceMode === 'local') {
-            baseRecords = pendingRecords;
+            // 本地数据：本次登录后扫描的所有记录（包括已同步的）
+            baseRecords = combined.filter(r => new Date(r.scanned_at) >= sessionStartTime);
         } else if (dataSourceMode === 'cloud') {
-            baseRecords = cloudDataLoaded ? cloudData : [];
+            baseRecords = cloudDataLoaded ? [...cloudData] : [];
         } else { // all
-            const combined = [...pendingRecords];
-            if (cloudDataLoaded) combined.push(...cloudData);
-            baseRecords = combined.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+            baseRecords = combined;
         }
 
         // 应用搜索关键词
@@ -1214,7 +1220,7 @@
         // 分组
         groupedRecords = groupRecords(filteredBase);
 
-        // 更新统计（基于所有原始记录，不受搜索影响？但统计面板应该基于当前数据源？我们基于当前数据源的原始记录）
+        // 更新统计（基于所有原始记录，不受搜索影响？我们基于当前数据源的原始记录）
         allRecords = baseRecords; // 用于统计
         renderStats(allRecords);
 
@@ -1307,7 +1313,7 @@
     }
 
     async function deleteRecord(localId, cloudId) {
-        if (!currentUser) return;
+        if (!currentUser) return false;
         if (localId) {
             pendingRecords = pendingRecords.filter(r => r.localId !== localId);
             savePendingToStorage();
@@ -1620,7 +1626,7 @@
         mainApp.style.display = 'block';
         logoutBtn.style.display = 'inline-block';
         userInfoDiv.innerText = `👤 ${user.email}`;
-        sessionStartTime = new Date();
+        sessionStartTime = new Date(); // 记录本次登录时间
         loadPendingFromStorage();
         updateSyncStatusUI();
         updateScanButtons();
