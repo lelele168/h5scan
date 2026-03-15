@@ -280,7 +280,7 @@
             border-collapse: collapse;
             margin-top: 16px;
             font-size: 0.95rem;
-            min-width: 600px; /* 保证在窄屏时触发滚动 */
+            min-width: 600px;
         }
         th {
             text-align: left;
@@ -428,7 +428,6 @@
             cursor: pointer;
             font-size: 1rem;
         }
-        /* 响应式调整 */
         @media (max-width: 640px) {
             h1 { font-size: 1.4rem; }
             .btn { padding: 10px 16px; font-size: 0.95rem; }
@@ -716,6 +715,10 @@
         updateSoundButton();
         showToast(soundEnabled ? '声音提醒已开启' : '声音提醒已关闭', 'success');
         console.log('声音开关:', soundEnabled ? '开启' : '关闭');
+        // 开启时播放语音，关闭时不播放（因为已静音）
+        if (soundEnabled) {
+            speak('声音已开启');
+        }
     }
     function updateSoundButton() {
         if (soundEnabled) {
@@ -944,6 +947,8 @@
         savePendingToStorage();
         updateSyncStatusUI();
         await loadMergedHistory();
+        // 同步完成后播放语音（如果原本有记录）
+        speak('同步完成');
     }
 
     // ================== 数据加载与合并 ==================
@@ -1368,9 +1373,16 @@
     });
 
     syncStatusDiv.addEventListener('click', () => {
-        if (isOnline && pendingRecords.length > 0) syncPendingRecords();
-        else if (!isOnline) showToast('离线无法同步', 'error');
-        else showToast('所有记录已同步', 'success');
+        if (isOnline && pendingRecords.length > 0) {
+            speak('开始同步');
+            syncPendingRecords();
+        } else if (!isOnline) {
+            speak('离线无法同步');
+            showToast('当前处于离线状态，无法同步', 'error');
+        } else {
+            speak('所有记录已同步');
+            showToast('所有记录已同步', 'success');
+        }
     });
 
     exportCsvBtn.addEventListener('click', async () => {
