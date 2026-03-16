@@ -737,7 +737,7 @@
     }
     soundToggleBtn.addEventListener('click', toggleSound);
 
-    // ================== 语音朗读（修复：每次获取语音列表，确保存在后备）==================
+    // ================== 语音朗读 ==================
     function speak(text) {
         if (!speechEnabled) return;
         if (!window.speechSynthesis) return;
@@ -1296,7 +1296,7 @@
         }
     }
 
-    // ================== 处理扫码结果（添加处理中标记，暂停扫码防止并发）==================
+    // ================== 处理扫码结果（暂停/恢复，确保恢复）==================
     async function handleTrackingNumber(trackingNumber) {
         // 如果该单号正在处理中，直接忽略本次触发
         if (window.processingTrackingNumbers.has(trackingNumber)) {
@@ -1318,7 +1318,12 @@
         // 如果当前正在扫码，暂停解码以避免处理期间的新触发
         let wasScanning = isScanning;
         if (wasScanning) {
-            try { Quagga.pause(); } catch(e) { console.warn('暂停扫码失败', e); }
+            try {
+                Quagga.pause();
+                console.log('扫码已暂停');
+            } catch(e) {
+                console.warn('暂停扫码失败', e);
+            }
         }
 
         try {
@@ -1364,20 +1369,35 @@
             renderStats(allRecords);
             updateSyncStatusUI();
 
-            if (isDuplicate) { speak('重复'); vibrate('repeat'); } else { speak('成功'); vibrate('success'); }
+            if (isDuplicate) {
+                speak('重复'); vibrate('repeat');
+                showToast('⚠️ 重复扫描，已保存', 'warning');
+            } else {
+                speak('成功'); vibrate('success');
+                showToast('✅ 扫描成功', 'success');
+            }
             showScanToast(trackingNumber);
             currentResult.style.display = 'block';
             trackingSpan.innerText = trackingNumber;
             carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
             scannedAtSpan.innerText = new Date().toLocaleString();
             duplicateHint.innerText = isDuplicate ? `⏰ 上次扫描：${lastTime.toLocaleString()}` : '';
-            showToast(isDuplicate ? '重复扫描，已保存' : '扫描成功', isDuplicate ? 'warning' : 'success');
         } finally {
             // 移除处理标记
             window.processingTrackingNumbers.delete(trackingNumber);
             // 恢复扫码（如果之前是运行的）
             if (wasScanning) {
-                try { Quagga.resume(); } catch(e) { console.warn('恢复扫码失败', e); }
+                try {
+                    Quagga.resume();
+                    console.log('扫码已恢复');
+                } catch(e) {
+                    console.warn('恢复扫码失败，尝试重新启动', e);
+                    // 如果恢复失败，尝试重新启动
+                    try {
+                        Quagga.stop();
+                        Quagga.start();
+                    } catch(e2) {}
+                }
             }
         }
     }
