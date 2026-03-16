@@ -375,7 +375,7 @@
                     共 <span id="totalCount">0</span> 条记录
                 </div>
 
-                <!-- 数据表格（新增照片列） -->
+                <!-- 数据表格（含照片列） -->
                 <div style="overflow-x: auto;">
                     <table id="dataTable">
                         <thead>
@@ -399,7 +399,7 @@
                 </div>
             </div>
 
-            <!-- 用户管理面板（初始隐藏） -->
+            <!-- 用户管理面板（初始隐藏，仅管理员可见） -->
             <div id="usersPanel" style="display: none;">
                 <div class="filter-bar">
                     <div class="filter-actions" style="margin-left: auto;">
@@ -476,7 +476,7 @@
     // ================== 配置 ==================
     const SUPABASE_URL = 'https://vmkpymrujtvguvmzcisc.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu';
-    const ADMIN_EMAIL = 'admin@example.com';
+    const ADMIN_EMAIL = 'admin@example.com';  // 管理员邮箱，可修改
 
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -647,7 +647,6 @@
         nextPageBtn.disabled = currentPage >= totalPages;
     }
 
-    // ================== 渲染表格（新增照片列）==================
     function renderTable(records) {
         if (records.length === 0) {
             tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px;">暂无数据</td></tr>';
@@ -697,9 +696,175 @@
         XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
     }
 
-    // ================== 用户管理 ==================
-    // 注意：以下代码仅为示例，实际使用时请确保包含完整用户管理功能
-    // 因篇幅限制，此处省略用户管理部分，请从之前稳定版本复制
+    // ================== 用户管理（通过 Edge Function）==================
+    async function loadUsers() {
+        if (!isAdmin(currentUser)) return;
+        try {
+            const { data, error } = await sbClient.functions.invoke('clever-action', { method: 'GET' });
+            if (error) throw error;
+            allUsers = data.users || [];
+            renderUsersPage();
+        } catch (err) {
+            console.error('加载用户列表失败', err);
+            showToast('加载用户列表失败：' + err.message, 'error');
+        }
+    }
+
+    function renderUsersPage() {
+        const totalPages = Math.ceil(allUsers.length / usersPageSize) || 1;
+        if (usersCurrentPage < 1) usersCurrentPage = 1;
+        if (usersCurrentPage > totalPages) usersCurrentPage = totalPages;
+        const start = (usersCurrentPage - 1) * usersPageSize;
+        const end = start + usersPageSize;
+        const pageUsers = allUsers.slice(start, end);
+        renderUsersTable(pageUsers);
+        usersPageInfo.innerText = `第 ${usersCurrentPage} 页 / 共 ${totalPages} 页`;
+        prevUsersPageBtn.disabled = usersCurrentPage <= 1;
+        nextUsersPageBtn.disabled = usersCurrentPage >= totalPages;
+    }
+
+    function renderUsersTable(users) {
+        if (users.length === 0) {
+            usersTableBody.innerHTML = '';
+            noUsersMsg.style.display = 'block';
+            return;
+        }
+        noUsersMsg.style.display = 'none';
+        usersTableBody.innerHTML = users.map(u => `
+            <tr>
+                <td>${escapeHtml(u.email)}</td>
+                <td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td>
+                <td>${u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : '未登录'}</td>
+                <td>
+                    <button class="btn btn-sm edit-user" data-id="${u.id}" data-email="${escapeHtml(u.email)}">✏️ 编辑</button>
+                    <button class="btn btn-sm reset-pwd" data-id="${u.id}">🔑 重置密码</button>
+                    <button class="delete-user-btn" data-id="${u.id}" title="删除用户" style="background:none; border:none; color:#ef4444; font-size:1.2rem; cursor:pointer;">🗑️</button>
+                </td>
+            </tr>
+        `).join('');
+
+        // 绑定编辑事件
+        document.querySelectorAll('.edit-user').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const id = btn.dataset.id;
+                const email = btn.dataset.email;
+                openEditUserModal(id, email);
+            });
+        });
+
+        // 绑定重置密码事件
+        document.querySelectorAll('.reset-pwd').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                const newPwd = prompt('请输入新密码（至少6位）');
+                if (newPwd && newPwd.length >= 6) {
+                    try {
+                        await sbClient.functions.invoke(`clever-action/${id}`, {
+                            method: 'PUT',
+                            body: { password: newPwd }
+                        });
+                        showToast('密码已重置', 'success');
+                        loadUsers();
+                    } catch (err) {
+                        showToast(err.message, 'error');
+                    }
+                } else if (newPwd) {
+                    showToast('密码至少6位', 'warning');
+                }
+            });
+        });
+
+        // 绑定删除事件
+        document.querySelectorAll('.delete-user-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const id = e.target.dataset.id;
+                if (!confirm('确定要删除该用户吗？此操作不可撤销。')) return;
+                try {
+                    await sbClient.functions.invoke(`clever-action/${id}`, {
+                        method: 'DELETE'
+                    });
+                    showToast('用户已删除', 'success');
+                    loadUsers();
+                } catch (err) {
+                    showToast(err.message, 'error');
+                }
+            });
+        });
+    }
+
+    // 新增用户
+    addUserBtn.addEventListener('click', () => {
+        userModalTitle.innerText = '新增用户';
+        userEmail.value = '';
+        userPassword.value = '';
+        userModal.classList.add('show');
+    });
+
+    // 编辑用户
+    function openEditUserModal(id, email) {
+        userModalTitle.innerText = '编辑用户';
+        userEmail.value = email;
+        userPassword.value = '';
+        userModal.dataset.editId = id;
+        userModal.classList.add('show');
+    }
+
+    cancelUserBtn.addEventListener('click', () => {
+        userModal.classList.remove('show');
+    });
+
+    saveUserBtn.addEventListener('click', async () => {
+        const email = userEmail.value.trim();
+        const password = userPassword.value.trim();
+        const isEdit = userModalTitle.innerText.includes('编辑');
+        const id = userModal.dataset.editId;
+
+        if (!email) {
+            showToast('邮箱不能为空', 'warning');
+            return;
+        }
+
+        try {
+            if (isEdit) {
+                const updates = { email };
+                if (password) updates.password = password;
+                await sbClient.functions.invoke(`clever-action/${id}`, {
+                    method: 'PUT',
+                    body: updates
+                });
+                showToast('用户更新成功', 'success');
+            } else {
+                if (!password || password.length < 6) {
+                    showToast('密码至少6位', 'warning');
+                    return;
+                }
+                await sbClient.functions.invoke('clever-action', {
+                    method: 'POST',
+                    body: { email, password }
+                });
+                showToast('用户创建成功', 'success');
+            }
+            userModal.classList.remove('show');
+            loadUsers();
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    });
+
+    // 用户分页
+    prevUsersPageBtn.addEventListener('click', () => {
+        if (usersCurrentPage > 1) {
+            usersCurrentPage--;
+            renderUsersPage();
+        }
+    });
+    nextUsersPageBtn.addEventListener('click', () => {
+        const totalPages = Math.ceil(allUsers.length / usersPageSize);
+        if (usersCurrentPage < totalPages) {
+            usersCurrentPage++;
+            renderUsersPage();
+        }
+    });
 
     // ================== 账户设置 ==================
     async function updateEmail(email) {
@@ -719,20 +884,16 @@
         showToast('密码修改成功', 'success');
     }
 
-    // 齿轮按钮点击事件 - 修正版
     settingsBtn.addEventListener('click', () => {
-        // 每次点击时重新获取元素，确保元素存在
-        const modal = document.getElementById('settingsModal');
-        if (modal) {
-            modal.classList.add('show');
-        } else {
-            console.error('未找到 settingsModal 元素');
-        }
+        newEmail.value = '';
+        oldPassword.value = '';
+        newPassword.value = '';
+        confirmPassword.value = '';
+        settingsModal.classList.add('show');
     });
 
     cancelSettingsBtn.addEventListener('click', () => {
-        const modal = document.getElementById('settingsModal');
-        if (modal) modal.classList.remove('show');
+        settingsModal.classList.remove('show');
     });
 
     saveSettingsBtn.addEventListener('click', async () => {
@@ -771,10 +932,31 @@
         }
     });
 
-    // 大图模态框关闭
-    closeImageBtn.addEventListener('click', () => imageModal.classList.remove('show'));
-    imageModal.addEventListener('click', e => {
-        if (e.target === imageModal) imageModal.classList.remove('show');
+    // ================== 选项卡切换 ==================
+    function switchTab(tab) {
+        if (tab === 'data') {
+            tabDataBtn.classList.add('active');
+            tabUsersBtn.classList.remove('active');
+            dataPanel.style.display = 'block';
+            usersPanel.style.display = 'none';
+        } else {
+            tabDataBtn.classList.remove('active');
+            tabUsersBtn.classList.add('active');
+            dataPanel.style.display = 'none';
+            usersPanel.style.display = 'block';
+            if (isAdmin(currentUser)) {
+                loadUsers();
+            }
+        }
+    }
+
+    tabDataBtn.addEventListener('click', () => switchTab('data'));
+    tabUsersBtn.addEventListener('click', () => {
+        if (!isAdmin(currentUser)) {
+            showToast('只有管理员可访问用户管理', 'warning');
+            return;
+        }
+        switchTab('users');
     });
 
     // ================== 用户认证 ==================
@@ -834,7 +1016,7 @@
         await sbClient.auth.signOut();
     });
 
-    // 数据管理事件绑定
+    // ================== 数据管理事件绑定 ==================
     applyFilterBtn.addEventListener('click', applyFilter);
     resetFilterBtn.addEventListener('click', resetFilter);
     exportBtn.addEventListener('click', exportToXLSX);
@@ -847,8 +1029,11 @@
         if (currentPage < totalPages) { currentPage++; renderPage(); }
     });
 
-    // 用户管理相关事件（需补全）
-    // 例如 loadUsers 等，此处省略
+    // 关闭大图
+    closeImageBtn.addEventListener('click', () => imageModal.classList.remove('show'));
+    imageModal.addEventListener('click', e => {
+        if (e.target === imageModal) imageModal.classList.remove('show');
+    });
 </script>
 </body>
 </html>
