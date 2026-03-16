@@ -1304,80 +1304,82 @@
     }
 
     // ================== 处理扫码结果（添加处理中标记，暂停扫码防止并发）==================
-    async function handleTrackingNumber(trackingNumber) {
-        // 如果该单号正在处理中，直接忽略本次触发
-        if (window.processingTrackingNumbers.has(trackingNumber)) {
-            console.log('单号正在处理中，忽略重复触发');
-            return;
-        }
+// 用于标记正在处理中的单号，防止并发重复
+if (!window.processingTrackingNumbers) {
+    window.processingTrackingNumbers = new Set();
+}
 
-        const now = Date.now();
-        // 原有防重：5秒内相同单号忽略
-        if (trackingNumber === lastScannedCode && now - lastScanTime < 5000) {
-            speak('重复'); vibrate('repeat');
-            showToast('⚠️ 5秒内重复扫码，已忽略', 'warning');
-            return;
-        }
-
-        // 暂停扫码，避免处理期间再次触发
-        if (isScanning) {
-            Quagga.pause();
-        }
-
-        // 标记开始处理
-        window.processingTrackingNumbers.add(trackingNumber);
-
-        try {
-            lastScannedCode = trackingNumber;
-            lastScanTime = now;
-            const carrier = detectCarrier(trackingNumber);
-            if (!carrier) {
-                speak('错误'); vibrate('error');
-                showToast('❌ 无效的快递单号', 'error');
-                currentResult.style.display = 'none';
-                return;
-            }
-            const limitCheck = await checkLimits(trackingNumber);
-            if (!limitCheck.allowed && !confirm(`⚠️ 限制提醒：${limitCheck.reason}。是否仍然保存？`)) {
-                speak('已取消'); showToast('保存已取消', 'warning'); return;
-            }
-            const note = getCurrentNote();
-            const lastTime = findLastScanTime(trackingNumber);
-            const isDuplicate = lastTime !== null;
-            let photoUrl = null;
-            if (!isLocalMode && isOnline && currentUser) {
-                photoUrl = await captureAndUploadPhoto(trackingNumber);
-                photoHint.innerText = photoUrl ? '📸 已拍照' : '📸 拍照失败';
-            } else {
-                photoHint.innerText = '';
-            }
-            await saveScanWithPhoto(trackingNumber, carrier, note, photoUrl);
-
-            // 强制刷新数据源并重新渲染当前页
-            allRecords = [...pendingRecords];
-            if (cloudDataLoaded) allRecords.push(...cloudData);
-            groupedRecords = groupRecords(allRecords);
-            renderPage();
-            renderStats(allRecords);
-            updateSyncStatusUI();
-
-            if (isDuplicate) { speak('重复'); vibrate('repeat'); } else { speak('成功'); vibrate('success'); }
-            showScanToast(trackingNumber);
-            currentResult.style.display = 'block';
-            trackingSpan.innerText = trackingNumber;
-            carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
-            scannedAtSpan.innerText = new Date().toLocaleString();
-            duplicateHint.innerText = isDuplicate ? `⏰ 上次扫描：${lastTime.toLocaleString()}` : '';
-            showToast(isDuplicate ? '重复扫描，已保存' : '扫描成功', isDuplicate ? 'warning' : 'success');
-        } finally {
-            // 处理完成后移除标记
-            window.processingTrackingNumbers.delete(trackingNumber);
-            // 恢复扫码
-            if (isScanning) {
-                Quagga.resume();
-            }
-        }
+async function handleTrackingNumber(trackingNumber) {
+    // 如果该单号正在处理中，直接忽略本次触发
+    if (window.processingTrackingNumbers.has(trackingNumber)) {
+        console.log('单号正在处理中，忽略重复触发');
+        return;
     }
+
+    const now = Date.now();
+    // 原有防重：5秒内相同单号忽略（不暂停扫码，只是忽略本次触发）
+    if (trackingNumber === lastScannedCode && now - lastScanTime < 5000) {
+        speak('重复'); vibrate('repeat');
+        showToast('⚠️ 5秒内重复扫码，已忽略', 'warning');
+        return;
+    }
+
+    // 标记开始处理（防止并发）
+    window.processingTrackingNumbers.add(trackingNumber);
+
+    try {
+        lastScannedCode = trackingNumber;
+        lastScanTime = now;
+
+        const carrier = detectCarrier(trackingNumber);
+        if (!carrier) {
+            speak('错误'); vibrate('error');
+            showToast('❌ 无效的快递单号', 'error');
+            currentResult.style.display = 'none';
+            return;
+        }
+
+        const limitCheck = await checkLimits(trackingNumber);
+        if (!limitCheck.allowed && !confirm(`⚠️ 限制提醒：${limitCheck.reason}。是否仍然保存？`)) {
+            speak('已取消'); showToast('保存已取消', 'warning');
+            return;
+        }
+
+        const note = getCurrentNote();
+        const lastTime = findLastScanTime(trackingNumber);
+        const isDuplicate = lastTime !== null;
+
+        let photoUrl = null;
+        if (!isLocalMode && isOnline && currentUser) {
+            photoUrl = await captureAndUploadPhoto(trackingNumber);
+            photoHint.innerText = photoUrl ? '📸 已拍照' : '📸 拍照失败';
+        } else {
+            photoHint.innerText = '';
+        }
+
+        await saveScanWithPhoto(trackingNumber, carrier, note, photoUrl);
+
+        // 刷新数据展示
+        allRecords = [...pendingRecords];
+        if (cloudDataLoaded) allRecords.push(...cloudData);
+        groupedRecords = groupRecords(allRecords);
+        renderPage();
+        renderStats(allRecords);
+        updateSyncStatusUI();
+
+        if (isDuplicate) { speak('重复'); vibrate('repeat'); } else { speak('成功'); vibrate('success'); }
+        showScanToast(trackingNumber);
+        currentResult.style.display = 'block';
+        trackingSpan.innerText = trackingNumber;
+        carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
+        scannedAtSpan.innerText = new Date().toLocaleString();
+        duplicateHint.innerText = isDuplicate ? `⏰ 上次扫描：${lastTime.toLocaleString()}` : '';
+        showToast(isDuplicate ? '重复扫描，已保存' : '扫描成功', isDuplicate ? 'warning' : 'success');
+    } finally {
+        // 处理完成后移除标记
+        window.processingTrackingNumbers.delete(trackingNumber);
+    }
+}
 
     function detectCarrier(tn) {
         for (let r of carrierRules) if (r.regex.test(tn)) return r.name;
