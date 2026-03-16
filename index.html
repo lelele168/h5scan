@@ -407,6 +407,7 @@
         .auth-footer { text-align: center; margin-top: 20px; cursor: pointer; color: #0284c7; }
         .photo-thumb { max-width: 60px; max-height: 60px; cursor: pointer; border-radius: 8px; transition: 0.2s; }
         .photo-thumb:hover { opacity: 0.8; }
+        .empty-search { text-align: center; padding: 30px; color: #94a3b8; font-size: 1rem; }
         @media (max-width: 640px) {
             .stats-panel { flex-direction: column; align-items: flex-start; }
             .toolbar { flex-direction: column; align-items: stretch; }
@@ -549,19 +550,16 @@
     </div>
 </div>
 
-<!-- 搜索模态框（含结果列表） -->
+<!-- 搜索模态框（含结果列表，已移除扫码按钮） -->
 <div id="searchModal" class="modal">
     <div class="modal-content" style="max-width: 600px;">
         <h3>🔍 搜索记录</h3>
         <div style="display: flex; gap: 8px; margin-bottom: 16px;">
             <input type="text" id="searchInput" placeholder="单号" autocomplete="off" style="flex:1; padding:12px 16px; border:1px solid #e2e8f0; border-radius:40px;">
             <button id="searchModalBtn" class="btn btn-primary">搜索</button>
-            <button id="scanSearchBtn" class="btn btn-success">📷 扫码</button>
         </div>
         <!-- 搜索结果列表 -->
-        <div id="searchResults" style="max-height: 400px; overflow-y: auto; border:1px solid #e2e8f0; border-radius:20px; padding:8px; margin-bottom:16px;">
-            <!-- 动态生成搜索结果 -->
-        </div>
+        <div id="searchResults" style="max-height: 400px; overflow-y: auto; border:1px solid #e2e8f0; border-radius:20px; padding:8px; margin-bottom:16px;"></div>
         <!-- 结果分页 -->
         <div class="pagination" id="searchPagination" style="margin-top:8px;">
             <button id="searchPrevPageBtn" disabled>◀ 上一页</button>
@@ -640,6 +638,11 @@
     let searchCurrentPage = 1;
     const searchPageSize = 10;
 
+    // 用于处理中单号标记，防止并发重复
+    if (!window.processingTrackingNumbers) {
+        window.processingTrackingNumbers = new Set();
+    }
+
     // DOM 元素
     const syncStatusDiv = document.getElementById('syncStatus');
     const localModeBadge = document.getElementById('localModeBadge');
@@ -691,7 +694,6 @@
     const manualModalConfirm = document.getElementById('manualModalConfirm');
     const searchModal = document.getElementById('searchModal');
     const searchInput = document.getElementById('searchInput');
-    const scanSearchBtn = document.getElementById('scanSearchBtn');
     const searchModalCancel = document.getElementById('searchModalCancel');
     const searchModalBtn = document.getElementById('searchModalBtn');
     const searchPrevPageBtn = document.getElementById('searchPrevPageBtn');
@@ -739,9 +741,7 @@
         if (!speechEnabled) return;
         if (!window.speechSynthesis) return;
         const voices = window.speechSynthesis.getVoices();
-        // 优先选择 Google 普通话
         const preferredVoice = voices.find(v => v.lang.includes('zh') && v.name.includes('Google 普通话'));
-        // 备选任意中文女声
         const fallbackVoice = voices.find(v => v.lang.includes('zh') && v.name.includes('Female'));
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
@@ -824,22 +824,18 @@
     manualModal.addEventListener('click', e => { if (e.target === manualModal) manualModal.classList.remove('show'); });
 
     // ================== 搜索（模态框内）==================
-    // 打开搜索模态框
     searchBtn.addEventListener('click', () => {
         searchInput.value = '';
         searchResultsDiv.innerHTML = '';
         searchModal.classList.add('show');
     });
 
-    // 执行搜索
     function performSearch() {
         const keyword = searchInput.value.trim().toLowerCase();
-        // 从 allRecords 中过滤（注意 allRecords 是合并后的所有记录）
         let filtered = allRecords.filter(r =>
             r.tracking_number.toLowerCase().includes(keyword) ||
             (r.carrier && r.carrier.toLowerCase().includes(keyword))
         );
-        // 按单号分组，便于展示
         const groups = {};
         filtered.forEach(rec => {
             const num = rec.tracking_number;
@@ -865,6 +861,13 @@
     }
 
     function renderSearchResults() {
+        if (searchResults.length === 0) {
+            searchResultsDiv.innerHTML = '<div class="empty-search">暂无匹配记录</div>';
+            searchPageInfo.innerText = '第 0 页 / 共 0 页';
+            searchPrevPageBtn.disabled = true;
+            searchNextPageBtn.disabled = true;
+            return;
+        }
         const totalPages = Math.ceil(searchResults.length / searchPageSize) || 1;
         if (searchCurrentPage < 1) searchCurrentPage = 1;
         if (searchCurrentPage > totalPages) searchCurrentPage = totalPages;
@@ -888,22 +891,17 @@
             `;
         }).join('');
 
-        // 绑定复制事件
         searchResultsDiv.querySelectorAll('.copy-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 navigator.clipboard.writeText(e.target.dataset.code);
                 showToast('单号已复制');
             });
         });
-
-        // 绑定详情事件
         searchResultsDiv.querySelectorAll('.detail-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 const number = e.target.dataset.number;
                 const group = searchResults.find(g => g.tracking_number === number);
-                if (group) {
-                    showDetailModal(number, group.records);
-                }
+                if (group) showDetailModal(number, group.records);
             });
         });
 
@@ -914,29 +912,8 @@
 
     searchModalBtn.addEventListener('click', performSearch);
     searchInput.addEventListener('keypress', e => { if (e.key === 'Enter') performSearch(); });
-
-    // 扫码搜索
-    scanSearchBtn.addEventListener('click', () => {
-        const wasScanning = isScanning;
-        if (wasScanning) pauseScanner();
-        Quagga.init({
-            inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#interactive'), constraints: { width: 640, height: 480, facingMode: "environment" } },
-            decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","code_39_reader","codabar_reader","upc_reader","i2of5_reader"] }
-        }, (err) => {
-            if (err) { showToast('无法启动摄像头', 'error'); return; }
-            Quagga.start(); showToast('请扫描条码', 'info');
-            const onDetected = (result) => {
-                const code = result.codeResult.code;
-                if (code) {
-                    Quagga.stop(); Quagga.offDetected(onDetected);
-                    searchInput.value = code;
-                    if (wasScanning) startScanner();
-                    performSearch(); // 自动搜索
-                }
-            };
-            Quagga.onDetected(onDetected);
-        });
-    });
+    searchModalCancel.addEventListener('click', () => searchModal.classList.remove('show'));
+    searchModal.addEventListener('click', e => { if (e.target === searchModal) searchModal.classList.remove('show'); });
 
     // 分页
     searchPrevPageBtn.addEventListener('click', () => {
@@ -952,10 +929,7 @@
         }
     });
 
-    searchModalCancel.addEventListener('click', () => searchModal.classList.remove('show'));
-    searchModal.addEventListener('click', e => { if (e.target === searchModal) searchModal.classList.remove('show'); });
-
-    // ================== 详情模态框（带图片放大）==================
+    // ================== 详情模态框（带图片放大，删除后强制刷新主表格）==================
     function showDetailModal(trackingNumber, records) {
         detailTitle.innerText = `单号详情 - ${trackingNumber}`;
         detailList.innerHTML = '';
@@ -982,29 +956,41 @@
             `;
             detailList.appendChild(div);
         });
-        // 绑定复制
+
         detailList.querySelectorAll('.copy-btn').forEach(btn => {
-            btn.addEventListener('click', e => { navigator.clipboard.writeText(e.target.dataset.code).then(() => showToast('单号已复制')); });
+            btn.addEventListener('click', e => {
+                navigator.clipboard.writeText(e.target.dataset.code).then(() => showToast('单号已复制'));
+            });
         });
-        // 绑定删除
+
         detailList.querySelectorAll('.delete-btn').forEach(btn => {
             btn.addEventListener('click', async e => {
-                const localId = e.target.dataset.localid, cloudId = e.target.dataset.cloudid;
+                const localId = e.target.dataset.localid;
+                const cloudId = e.target.dataset.cloudid;
                 if (confirm('确定删除这条记录？')) {
-                    await deleteRecord(localId, cloudId);
-                    detailModal.classList.remove('show');
-                    applyDataSource();
-                    updateSyncStatusUI();
+                    const success = await deleteRecord(localId, cloudId);
+                    if (success) {
+                        detailModal.classList.remove('show');
+                        // 强制刷新主表格
+                        allRecords = [...pendingRecords];
+                        if (cloudDataLoaded) allRecords.push(...cloudData);
+                        groupedRecords = groupRecords(allRecords);
+                        renderPage();
+                        renderStats(allRecords);
+                        updateSyncStatusUI();
+                        showToast('记录已删除', 'success');
+                    }
                 }
             });
         });
-        // 绑定图片点击放大
+
         detailList.querySelectorAll('.photo-thumb').forEach(img => {
             img.addEventListener('click', () => {
                 largeImage.src = img.dataset.url;
                 imageModal.classList.add('show');
             });
         });
+
         detailModal.classList.add('show');
     }
     detailModalClose.addEventListener('click', () => detailModal.classList.remove('show'));
@@ -1231,19 +1217,31 @@
     dataSourceCloud.addEventListener('click', () => setDataSource('cloud'));
     dataSourceAll.addEventListener('click', () => setDataSource('all'));
 
-    // ================== 限制检查 ==================
+    // ================== 限制检查（本地2次，当天3次，当月5次）==================
     async function checkLimits(trackingNumber) {
         const localCount = pendingRecords.filter(r => r.tracking_number === trackingNumber).length;
-        if (localCount >= 3) return { allowed: false, reason: '本设备上该单号已扫描3次' };
+        if (localCount >= 2) {
+            return { allowed: false, reason: '本设备上该单号已扫描2次' };
+        }
         if (isLocalMode || !isOnline || !currentUser) return { allowed: true };
         const now = new Date();
         const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
         try {
-            const { count: dayCount } = await sbClient.from('scans').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id).eq('tracking_number', trackingNumber).gte('scanned_at', startOfDay);
-            const { count: monthCount } = await sbClient.from('scans').select('*', { count: 'exact', head: true }).eq('user_id', currentUser.id).eq('tracking_number', trackingNumber).gte('scanned_at', startOfMonth);
-            if (dayCount >= 6) return { allowed: false, reason: '当天该单号已扫描6次' };
-            if (monthCount >= 10) return { allowed: false, reason: '当月该单号已扫描10次' };
+            const { count: dayCount } = await sbClient
+                .from('scans')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', currentUser.id)
+                .eq('tracking_number', trackingNumber)
+                .gte('scanned_at', startOfDay);
+            const { count: monthCount } = await sbClient
+                .from('scans')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', currentUser.id)
+                .eq('tracking_number', trackingNumber)
+                .gte('scanned_at', startOfMonth);
+            if (dayCount >= 3) return { allowed: false, reason: '当天该单号已扫描3次' };
+            if (monthCount >= 5) return { allowed: false, reason: '当月该单号已扫描5次' };
             return { allowed: true };
         } catch (err) { return { allowed: true }; }
     }
@@ -1260,7 +1258,6 @@
         canvas.getContext('2d').drawImage(video, 0, 0);
         const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8));
         if (!blob) return null;
-        // 获取该单号已有的照片数量（包括云端和本地）
         let existingPhotos = 0;
         if (cloudDataLoaded) {
             existingPhotos = cloudData.filter(r => r.tracking_number === trackingNumber && r.photo_url).length;
@@ -1295,46 +1292,55 @@
         }
     }
 
-    // ================== 处理扫码结果 ==================
+    // ================== 处理扫码结果（添加处理中标记防止并发重复）==================
     async function handleTrackingNumber(trackingNumber) {
+        if (window.processingTrackingNumbers.has(trackingNumber)) {
+            console.log('单号正在处理中，忽略重复触发');
+            return;
+        }
         const now = Date.now();
         if (trackingNumber === lastScannedCode && now - lastScanTime < 5000) {
             speak('重复'); vibrate('repeat');
             showToast('⚠️ 5秒内重复扫码，已忽略', 'warning');
             return;
         }
-        lastScannedCode = trackingNumber;
-        lastScanTime = now;
-        const carrier = detectCarrier(trackingNumber);
-        if (!carrier) {
-            speak('错误'); vibrate('error');
-            showToast('❌ 无效的快递单号', 'error');
-            currentResult.style.display = 'none';
-            return;
+        window.processingTrackingNumbers.add(trackingNumber);
+        try {
+            lastScannedCode = trackingNumber;
+            lastScanTime = now;
+            const carrier = detectCarrier(trackingNumber);
+            if (!carrier) {
+                speak('错误'); vibrate('error');
+                showToast('❌ 无效的快递单号', 'error');
+                currentResult.style.display = 'none';
+                return;
+            }
+            const limitCheck = await checkLimits(trackingNumber);
+            if (!limitCheck.allowed && !confirm(`⚠️ 限制提醒：${limitCheck.reason}。是否仍然保存？`)) {
+                speak('已取消'); showToast('保存已取消', 'warning'); return;
+            }
+            const note = getCurrentNote();
+            const lastTime = findLastScanTime(trackingNumber);
+            const isDuplicate = lastTime !== null;
+            let photoUrl = null;
+            if (!isLocalMode && isOnline && currentUser) {
+                photoUrl = await captureAndUploadPhoto(trackingNumber);
+                photoHint.innerText = photoUrl ? '📸 已拍照' : '📸 拍照失败';
+            } else {
+                photoHint.innerText = '';
+            }
+            await saveScanWithPhoto(trackingNumber, carrier, note, photoUrl);
+            if (isDuplicate) { speak('重复'); vibrate('repeat'); } else { speak('成功'); vibrate('success'); }
+            showScanToast(trackingNumber);
+            currentResult.style.display = 'block';
+            trackingSpan.innerText = trackingNumber;
+            carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
+            scannedAtSpan.innerText = new Date().toLocaleString();
+            duplicateHint.innerText = isDuplicate ? `⏰ 上次扫描：${lastTime.toLocaleString()}` : '';
+            showToast(isDuplicate ? '重复扫描，已保存' : '扫描成功', isDuplicate ? 'warning' : 'success');
+        } finally {
+            window.processingTrackingNumbers.delete(trackingNumber);
         }
-        const limitCheck = await checkLimits(trackingNumber);
-        if (!limitCheck.allowed && !confirm(`⚠️ 限制提醒：${limitCheck.reason}。是否仍然保存？`)) {
-            speak('已取消'); showToast('保存已取消', 'warning'); return;
-        }
-        const note = getCurrentNote();
-        const lastTime = findLastScanTime(trackingNumber);
-        const isDuplicate = lastTime !== null;
-        let photoUrl = null;
-        if (!isLocalMode && isOnline && currentUser) {
-            photoUrl = await captureAndUploadPhoto(trackingNumber);
-            photoHint.innerText = photoUrl ? '📸 已拍照' : '📸 拍照失败';
-        } else {
-            photoHint.innerText = '';
-        }
-        await saveScanWithPhoto(trackingNumber, carrier, note, photoUrl);
-        if (isDuplicate) { speak('重复'); vibrate('repeat'); } else { speak('成功'); vibrate('success'); }
-        showScanToast(trackingNumber);
-        currentResult.style.display = 'block';
-        trackingSpan.innerText = trackingNumber;
-        carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
-        scannedAtSpan.innerText = new Date().toLocaleString();
-        duplicateHint.innerText = isDuplicate ? `⏰ 上次扫描：${lastTime.toLocaleString()}` : '';
-        showToast(isDuplicate ? '重复扫描，已保存' : '扫描成功', isDuplicate ? 'warning' : 'success');
     }
 
     function detectCarrier(tn) {
