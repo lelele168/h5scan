@@ -11,7 +11,6 @@
     <!-- SheetJS 用于导出 XLSX -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* 样式与之前保持一致，仅作微调 */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -406,7 +405,7 @@
         }
         .tab-btn.active { background: #e0f2fe; color: #0369a1; }
         .auth-footer { text-align: center; margin-top: 20px; cursor: pointer; color: #0284c7; }
-        .photo-thumb { max-width: 100px; max-height: 80px; cursor: pointer; border-radius: 8px; transition: 0.2s; }
+        .photo-thumb { max-width: 60px; max-height: 60px; cursor: pointer; border-radius: 8px; transition: 0.2s; }
         .photo-thumb:hover { opacity: 0.8; }
         @media (max-width: 640px) {
             .stats-panel { flex-direction: column; align-items: flex-start; }
@@ -545,25 +544,41 @@
 <div id="manualModal" class="modal">
     <div class="modal-content">
         <h3>📝 手动输入单号</h3>
-        <input type="text" id="manualModalInput" placeholder="请输入快递单号" autocomplete="off">
+        <input type="text" id="manualModalInput" placeholder="单号" autocomplete="off">
         <div class="modal-buttons"><button id="manualModalCancel" class="btn">取消</button><button id="manualModalConfirm" class="btn btn-primary">确认</button></div>
     </div>
 </div>
 
-<!-- 搜索模态框（已移除扫码搜索按钮） -->
+<!-- 搜索模态框（含结果列表） -->
 <div id="searchModal" class="modal">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 600px;">
         <h3>🔍 搜索记录</h3>
-        <input type="text" id="searchInput" placeholder="输入单号或快递公司" autocomplete="off">
-        <div class="modal-buttons"><button id="searchModalCancel" class="btn">取消</button><button id="searchModalConfirm" class="btn btn-primary">搜索</button></div>
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <input type="text" id="searchInput" placeholder="单号" autocomplete="off" style="flex:1; padding:12px 16px; border:1px solid #e2e8f0; border-radius:40px;">
+            <button id="searchModalBtn" class="btn btn-primary">搜索</button>
+            <button id="scanSearchBtn" class="btn btn-success">📷 扫码</button>
+        </div>
+        <!-- 搜索结果列表 -->
+        <div id="searchResults" style="max-height: 400px; overflow-y: auto; border:1px solid #e2e8f0; border-radius:20px; padding:8px; margin-bottom:16px;">
+            <!-- 动态生成搜索结果 -->
+        </div>
+        <!-- 结果分页 -->
+        <div class="pagination" id="searchPagination" style="margin-top:8px;">
+            <button id="searchPrevPageBtn" disabled>◀ 上一页</button>
+            <span id="searchPageInfo">第 1 页 / 共 1 页</span>
+            <button id="searchNextPageBtn" disabled>下一页 ▶</button>
+        </div>
+        <div class="modal-buttons">
+            <button id="searchModalCancel" class="btn">关闭</button>
+        </div>
     </div>
 </div>
 
-<!-- 详情模态框（用于查看单号详细记录） -->
+<!-- 详情模态框 -->
 <div id="detailModal" class="modal">
     <div class="modal-content" style="max-width: 600px;">
         <h3 id="detailTitle">单号详情</h3>
-        <div id="detailList" style="max-height: 400px; overflow-y: auto;"></div>
+        <div id="detailList" style="max-height: 400px; overflow-y: auto; border:1px solid #e2e8f0; border-radius:20px; padding:8px;"></div>
         <div class="modal-buttons"><button id="detailModalClose" class="btn btn-primary">关闭</button></div>
     </div>
 </div>
@@ -618,7 +633,12 @@
     let groupedRecords = [];
     let dataSourceMode = 'local';
     let searchKeyword = '';
-    let isLocalMode = false; // 本地模式标志
+    let isLocalMode = false;
+
+    // 搜索相关变量
+    let searchResults = [];
+    let searchCurrentPage = 1;
+    const searchPageSize = 10;
 
     // DOM 元素
     const syncStatusDiv = document.getElementById('syncStatus');
@@ -671,8 +691,13 @@
     const manualModalConfirm = document.getElementById('manualModalConfirm');
     const searchModal = document.getElementById('searchModal');
     const searchInput = document.getElementById('searchInput');
+    const scanSearchBtn = document.getElementById('scanSearchBtn');
     const searchModalCancel = document.getElementById('searchModalCancel');
-    const searchModalConfirm = document.getElementById('searchModalConfirm');
+    const searchModalBtn = document.getElementById('searchModalBtn');
+    const searchPrevPageBtn = document.getElementById('searchPrevPageBtn');
+    const searchNextPageBtn = document.getElementById('searchNextPageBtn');
+    const searchPageInfo = document.getElementById('searchPageInfo');
+    const searchResultsDiv = document.getElementById('searchResults');
     const detailModal = document.getElementById('detailModal');
     const detailTitle = document.getElementById('detailTitle');
     const detailList = document.getElementById('detailList');
@@ -709,18 +734,23 @@
     }
     soundToggleBtn.addEventListener('click', toggleSound);
 
-    // ================== 语音朗读 ==================
+    // ================== 语音朗读（Google普通话，音高1.0，语速1.2）==================
     function speak(text) {
         if (!speechEnabled) return;
         if (!window.speechSynthesis) return;
+        const voices = window.speechSynthesis.getVoices();
+        // 优先选择 Google 普通话
+        const preferredVoice = voices.find(v => v.lang.includes('zh') && v.name.includes('Google 普通话'));
+        // 备选任意中文女声
+        const fallbackVoice = voices.find(v => v.lang.includes('zh') && v.name.includes('Female'));
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = 'zh-CN';
         utterance.rate = 1.2;
-        utterance.pitch = 1.5;
-        const voices = window.speechSynthesis.getVoices();
-        const femaleVoice = voices.find(v => v.lang.includes('zh') && v.name.includes('Female'));
-        if (femaleVoice) utterance.voice = femaleVoice;
+        utterance.pitch = 1.0;
+        utterance.volume = 1;
+        if (preferredVoice) utterance.voice = preferredVoice;
+        else if (fallbackVoice) utterance.voice = fallbackVoice;
         window.speechSynthesis.speak(utterance);
     }
     testSoundBtn.addEventListener('click', () => { speak('测试声音'); showToast('测试声音已播放', 'info'); });
@@ -793,19 +823,136 @@
     manualModalInput.addEventListener('keypress', e => { if (e.key === 'Enter') manualModalConfirm.click(); });
     manualModal.addEventListener('click', e => { if (e.target === manualModal) manualModal.classList.remove('show'); });
 
-    // ================== 搜索（已移除扫码搜索）==================
+    // ================== 搜索（模态框内）==================
+    // 打开搜索模态框
     searchBtn.addEventListener('click', () => {
         searchInput.value = '';
+        searchResultsDiv.innerHTML = '';
         searchModal.classList.add('show');
-        searchInput.focus();
     });
+
+    // 执行搜索
+    function performSearch() {
+        const keyword = searchInput.value.trim().toLowerCase();
+        // 从 allRecords 中过滤（注意 allRecords 是合并后的所有记录）
+        let filtered = allRecords.filter(r =>
+            r.tracking_number.toLowerCase().includes(keyword) ||
+            (r.carrier && r.carrier.toLowerCase().includes(keyword))
+        );
+        // 按单号分组，便于展示
+        const groups = {};
+        filtered.forEach(rec => {
+            const num = rec.tracking_number;
+            if (!groups[num]) {
+                groups[num] = {
+                    tracking_number: num,
+                    records: [],
+                    carrier: rec.carrier,
+                    last_time: rec.scanned_at,
+                    count: 0
+                };
+            }
+            groups[num].records.push(rec);
+            if (new Date(rec.scanned_at) > new Date(groups[num].last_time)) {
+                groups[num].last_time = rec.scanned_at;
+                groups[num].carrier = rec.carrier;
+            }
+            groups[num].count++;
+        });
+        searchResults = Object.values(groups).sort((a,b) => new Date(b.last_time) - new Date(a.last_time));
+        searchCurrentPage = 1;
+        renderSearchResults();
+    }
+
+    function renderSearchResults() {
+        const totalPages = Math.ceil(searchResults.length / searchPageSize) || 1;
+        if (searchCurrentPage < 1) searchCurrentPage = 1;
+        if (searchCurrentPage > totalPages) searchCurrentPage = totalPages;
+        const start = (searchCurrentPage - 1) * searchPageSize;
+        const end = start + searchPageSize;
+        const pageGroups = searchResults.slice(start, end);
+
+        searchResultsDiv.innerHTML = pageGroups.map(group => {
+            const hasPhoto = group.records.some(r => r.photo_url) ? '📸' : '';
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #e2e8f0;">
+                    <div>
+                        <div><strong>${escapeHtml(group.tracking_number)}</strong> ${hasPhoto}</div>
+                        <div>${escapeHtml(group.carrier)} | 共 ${group.count} 条 | 最新: ${new Date(group.last_time).toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <button class="copy-btn" data-code="${escapeHtml(group.tracking_number)}">📋</button>
+                        <button class="detail-btn" data-number="${escapeHtml(group.tracking_number)}">📋 详情</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // 绑定复制事件
+        searchResultsDiv.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                navigator.clipboard.writeText(e.target.dataset.code);
+                showToast('单号已复制');
+            });
+        });
+
+        // 绑定详情事件
+        searchResultsDiv.querySelectorAll('.detail-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const number = e.target.dataset.number;
+                const group = searchResults.find(g => g.tracking_number === number);
+                if (group) {
+                    showDetailModal(number, group.records);
+                }
+            });
+        });
+
+        searchPageInfo.innerText = `第 ${searchCurrentPage} 页 / 共 ${totalPages} 页`;
+        searchPrevPageBtn.disabled = searchCurrentPage <= 1;
+        searchNextPageBtn.disabled = searchCurrentPage >= totalPages;
+    }
+
+    searchModalBtn.addEventListener('click', performSearch);
+    searchInput.addEventListener('keypress', e => { if (e.key === 'Enter') performSearch(); });
+
+    // 扫码搜索
+    scanSearchBtn.addEventListener('click', () => {
+        const wasScanning = isScanning;
+        if (wasScanning) pauseScanner();
+        Quagga.init({
+            inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#interactive'), constraints: { width: 640, height: 480, facingMode: "environment" } },
+            decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","code_39_reader","codabar_reader","upc_reader","i2of5_reader"] }
+        }, (err) => {
+            if (err) { showToast('无法启动摄像头', 'error'); return; }
+            Quagga.start(); showToast('请扫描条码', 'info');
+            const onDetected = (result) => {
+                const code = result.codeResult.code;
+                if (code) {
+                    Quagga.stop(); Quagga.offDetected(onDetected);
+                    searchInput.value = code;
+                    if (wasScanning) startScanner();
+                    performSearch(); // 自动搜索
+                }
+            };
+            Quagga.onDetected(onDetected);
+        });
+    });
+
+    // 分页
+    searchPrevPageBtn.addEventListener('click', () => {
+        if (searchCurrentPage > 1) {
+            searchCurrentPage--;
+            renderSearchResults();
+        }
+    });
+    searchNextPageBtn.addEventListener('click', () => {
+        if (searchCurrentPage < Math.ceil(searchResults.length / searchPageSize)) {
+            searchCurrentPage++;
+            renderSearchResults();
+        }
+    });
+
     searchModalCancel.addEventListener('click', () => searchModal.classList.remove('show'));
-    searchModalConfirm.addEventListener('click', () => {
-        searchKeyword = searchInput.value.trim();
-        searchModal.classList.remove('show');
-        applyDataSource();
-    });
-    searchInput.addEventListener('keypress', e => { if (e.key === 'Enter') searchModalConfirm.click(); });
     searchModal.addEventListener('click', e => { if (e.target === searchModal) searchModal.classList.remove('show'); });
 
     // ================== 详情模态框（带图片放大）==================
@@ -818,17 +965,19 @@
             div.className = 'modal-list-item';
             let photoHtml = '';
             if (rec.photo_url) {
-                photoHtml = `<img src="${rec.photo_url}" class="photo-thumb" data-url="${rec.photo_url}" style="max-width:100px; max-height:80px; margin-top:8px; cursor:pointer;">`;
+                photoHtml = `<img src="${rec.photo_url}" class="photo-thumb" data-url="${rec.photo_url}" style="max-width:60px; max-height:60px; margin-top:8px; cursor:pointer;">`;
             }
             div.innerHTML = `
-                <div>
-                    <div>${new Date(rec.scanned_at).toLocaleString()}</div>
-                    <small>备注: ${rec.notes || '无'}</small>
-                    ${photoHtml}
-                </div>
-                <div>
-                    <button class="copy-btn" data-code="${escapeHtml(rec.tracking_number)}">📋</button>
-                    <button class="delete-btn" data-localid="${rec.localId || ''}" data-cloudid="${rec.id || ''}">🗑️</button>
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #e2e8f0;">
+                    <div>
+                        <div>${new Date(rec.scanned_at).toLocaleString()}</div>
+                        <small>备注: ${rec.notes || '无'}</small>
+                        ${photoHtml}
+                    </div>
+                    <div>
+                        <button class="copy-btn" data-code="${escapeHtml(rec.tracking_number)}">📋</button>
+                        <button class="delete-btn" data-localid="${rec.localId || ''}" data-cloudid="${rec.id || ''}">🗑️</button>
+                    </div>
                 </div>
             `;
             detailList.appendChild(div);
@@ -844,7 +993,6 @@
                 if (confirm('确定删除这条记录？')) {
                     await deleteRecord(localId, cloudId);
                     detailModal.classList.remove('show');
-                    // 删除后重新应用数据源，表格实时更新
                     applyDataSource();
                     updateSyncStatusUI();
                 }
@@ -963,7 +1111,6 @@
         } else if (dataSourceMode === 'cloud') {
             baseRecords = (isLocalMode || !cloudDataLoaded) ? [] : [...cloudData];
         } else {
-            // all
             baseRecords = isLocalMode ? pendingRecords : [...pendingRecords, ...(cloudDataLoaded ? cloudData : [])];
         }
         if (searchKeyword) {
@@ -1113,17 +1260,14 @@
         canvas.getContext('2d').drawImage(video, 0, 0);
         const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8));
         if (!blob) return null;
-
         // 获取该单号已有的照片数量（包括云端和本地）
         let existingPhotos = 0;
         if (cloudDataLoaded) {
             existingPhotos = cloudData.filter(r => r.tracking_number === trackingNumber && r.photo_url).length;
         }
-        // 加上 pending 中已拍照但未同步的
         existingPhotos += pendingRecords.filter(r => r.tracking_number === trackingNumber && r.photo_url).length;
         const nextNum = existingPhotos + 1;
         const fileName = `${trackingNumber}/${trackingNumber}-${nextNum}.jpg`;
-
         const { error } = await sbClient.storage.from('scan-photos').upload(fileName, blob, { contentType: 'image/jpeg', cacheControl: '3600' });
         if (error) { console.error('照片上传失败', error); return null; }
         const { data: { publicUrl } } = sbClient.storage.from('scan-photos').getPublicUrl(fileName);
@@ -1284,7 +1428,6 @@
         isLocalMode = false;
         sessionStartTime = new Date();
         showApp(user);
-        // 自动同步本地记录
         if (pendingRecords.length > 0) {
             speak('开始同步本地记录');
             await syncPendingRecords();
@@ -1308,7 +1451,7 @@
             const { error } = await sbClient.auth.signInWithPassword({ email, password });
             if (error) throw error;
         } catch (err) {
-            loginError.innerText = err.message; // 显示错误信息
+            loginError.innerText = err.message;
         }
     });
 
@@ -1358,36 +1501,28 @@
         else if (!isOnline) { speak('离线无法同步'); showToast('当前处于离线状态，无法同步', 'error'); }
         else { speak('所有记录已同步'); showToast('所有记录已同步', 'success'); }
     });
-// 导出 CSV（移除照片列）
-exportCsvBtn.addEventListener('click', async () => {
-    let records = allRecords;
-    if (!records.length) { showToast('暂无数据', 'warning'); return; }
-    const headers = ['单号','快递公司','扫描时间','备注'];
-    const rows = records.map(r => [r.tracking_number, r.carrier||'', new Date(r.scanned_at).toLocaleString(), r.notes||'']);
-    const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
-    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `快递记录_${new Date().toISOString().slice(0,10)}.csv`;
-    link.click();
-    URL.revokeObjectURL(link.href);
-});
-
-// 导出 XLSX（移除照片列）
-exportXlsxBtn.addEventListener('click', async () => {
-    let records = allRecords;
-    if (!records.length) { showToast('暂无数据', 'warning'); return; }
-    const data = records.map(r => ({
-        '单号': r.tracking_number,
-        '快递公司': r.carrier || '',
-        '扫描时间': new Date(r.scanned_at).toLocaleString(),
-        '备注': r.notes || ''
-    }));
-    const ws = XLSX.utils.json_to_sheet(data);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '扫描记录');
-    XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
-});
+    exportCsvBtn.addEventListener('click', async () => {
+        let records = allRecords;
+        if (!records.length) { showToast('暂无数据', 'warning'); return; }
+        const headers = ['单号','快递公司','扫描时间','备注'];
+        const rows = records.map(r => [r.tracking_number, r.carrier||'', new Date(r.scanned_at).toLocaleString(), r.notes||'']);
+        const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `快递记录_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    });
+    exportXlsxBtn.addEventListener('click', async () => {
+        let records = allRecords;
+        if (!records.length) { showToast('暂无数据', 'warning'); return; }
+        const data = records.map(r => ({ '单号': r.tracking_number, '快递公司': r.carrier||'', '扫描时间': new Date(r.scanned_at).toLocaleString(), '备注': r.notes||'' }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '扫描记录');
+        XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
+    });
 
     // ================== 工具函数 ==================
     function escapeHtml(unsafe) { return unsafe.replace(/[&<>"']/g, m => { if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; if(m==='"') return '&quot;'; if(m==="'") return '&#039;'; return m; }); }
