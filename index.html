@@ -11,7 +11,7 @@
     <!-- SheetJS 用于导出 XLSX -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* 样式与之前相同，省略以节省篇幅，实际使用时请保留完整样式 */
+        /* ================== 基础样式 ================== */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -115,6 +115,8 @@
         .btn-warning { background: #f59e0b; color: white; }
         .btn-danger { background: #ef4444; color: white; }
         .btn-sm { padding: 8px 16px; font-size: 0.9rem; }
+
+        /* ================== 扫描器 ================== */
         .scanner-container {
             width: 100%;
             border-radius: 24px;
@@ -122,6 +124,7 @@
             background: #0f172a;
             margin: 20px 0;
             box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1);
+            position: relative;
         }
         #interactive.viewport {
             position: relative;
@@ -134,6 +137,43 @@
             height: auto;
             display: block;
         }
+        /* 扫描辅助线 */
+        .scan-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .scan-frame {
+            position: absolute;
+            top: 20%;
+            left: 10%;
+            width: 80%;
+            height: 60%;
+            border: 2px solid rgba(255, 255, 255, 0.5);
+            border-radius: 16px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+        .scan-line {
+            width: 70%;
+            height: 2px;
+            background: #ff4444;
+            box-shadow: 0 0 15px #ff0000;
+            position: relative;
+            animation: scan 2.5s infinite ease-in-out;
+            opacity: 0.9;
+        }
+        @keyframes scan {
+            0% { transform: translateY(-150%); }
+            50% { transform: translateY(150%); }
+            100% { transform: translateY(-150%); }
+        }
+
         .scanner-controls { display: flex; gap: 12px; margin: 16px 0; justify-content: center; flex-wrap: wrap; }
         .manual-section { display: flex; gap: 12px; margin: 20px 0; justify-content: center; flex-wrap: wrap; }
         .note-section {
@@ -165,6 +205,7 @@
         }
         .lock-toggle.locked { color: #0284c7; border-color: #0284c7; background: #e0f2fe; }
         .lock-toggle.unlocked { color: #94a3b8; }
+
         .result-card {
             background: #e0f2fe;
             padding: 20px;
@@ -190,6 +231,7 @@
             font-size: 0.7rem;
             margin-left: 6px;
         }
+
         .stats-panel {
             background: #f8fafc;
             border-radius: 24px;
@@ -211,6 +253,7 @@
             border-radius: 40px;
             border: 1px solid #e2e8f0;
         }
+
         .toolbar {
             display: flex;
             flex-wrap: wrap;
@@ -257,6 +300,7 @@
             color: white;
             border-color: #0284c7;
         }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -282,6 +326,7 @@
         .copy-btn { color: #0284c7; }
         .delete-btn { color: #ef4444; }
         .export-btn { background: #0f172a; color: white; }
+
         .pagination {
             display: flex;
             gap: 8px;
@@ -300,6 +345,7 @@
             border: 1px solid #e2e8f0;
         }
         .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+
         .toast-message {
             position: fixed;
             top: 20px;
@@ -318,6 +364,7 @@
         .toast-message.success { background: #10b981; }
         .toast-message.error { background: #ef4444; }
         .toast-message.warning { background: #f59e0b; }
+
         .scan-toast {
             position: fixed;
             top: 100px;
@@ -332,6 +379,7 @@
             transition: opacity 0.3s;
         }
         .scan-toast.show { opacity: 1; }
+
         .modal {
             display: none;
             position: fixed;
@@ -353,7 +401,7 @@
             max-width: 400px;
             width: 100%;
         }
-        .modal-content.large { max-width: 90vw; max-height: 90vh; }
+        .modal-content.large { max-width: 90vw; max-height: 90vh; background: transparent; box-shadow: none; }
         .modal-content input {
             width: 100%;
             padding: 12px 16px;
@@ -361,6 +409,8 @@
             border-radius: 40px;
             margin-bottom: 16px;
         }
+        .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
+
         .test-sound { margin: 12px 0; text-align: center; }
         .test-sound button {
             background: #f1f5f9;
@@ -369,6 +419,7 @@
             padding: 10px 28px;
             cursor: pointer;
         }
+
         .auth-container {
             max-width: 400px;
             margin: 40px auto;
@@ -406,9 +457,11 @@
         }
         .tab-btn.active { background: #e0f2fe; color: #0369a1; }
         .auth-footer { text-align: center; margin-top: 20px; cursor: pointer; color: #0284c7; }
+
         .photo-thumb { max-width: 60px; max-height: 60px; cursor: pointer; border-radius: 8px; transition: 0.2s; }
         .photo-thumb:hover { opacity: 0.8; }
         .empty-search { text-align: center; padding: 30px; color: #94a3b8; font-size: 1rem; }
+
         @media (max-width: 640px) {
             .stats-panel { flex-direction: column; align-items: flex-start; }
             .toolbar { flex-direction: column; align-items: stretch; }
@@ -465,6 +518,11 @@
         <div id="mainApp" style="display: none;">
             <div class="scanner-container">
                 <div id="interactive" class="viewport"></div>
+                <!-- 扫描辅助线 -->
+                <div class="scan-overlay">
+                    <div class="scan-frame"></div>
+                    <div class="scan-line"></div>
+                </div>
             </div>
             <div class="scanner-controls">
                 <button id="startScanBtn" class="btn btn-success">▶️ 开始扫码</button>
@@ -584,7 +642,7 @@
 
 <!-- 大图查看模态框 -->
 <div id="imageModal" class="modal">
-    <div class="modal-content large" style="background: transparent; box-shadow: none;">
+    <div class="modal-content large">
         <img id="largeImage" style="max-width: 100%; max-height: 90vh; margin: auto; display: block; border-radius: 16px;">
         <div style="text-align: center; margin-top: 16px;"><button id="closeImageBtn" class="btn btn-primary">关闭</button></div>
     </div>
@@ -1320,7 +1378,7 @@
         if (wasScanning) {
             try {
                 Quagga.pause();
-                console.log('扫码已暂停');
+                console.log('扫码已暂停（处理条码）');
             } catch(e) {
                 console.warn('暂停扫码失败', e);
             }
@@ -1392,7 +1450,6 @@
                     console.log('扫码已恢复');
                 } catch(e) {
                     console.warn('恢复扫码失败，尝试重新启动', e);
-                    // 如果恢复失败，尝试重新启动
                     try {
                         Quagga.stop();
                         Quagga.start();
