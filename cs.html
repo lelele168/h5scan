@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>语音测试 · 温柔性感女神</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Roboto, system-ui, sans-serif;
+            background: linear-gradient(145deg, #f9f0f5 0%, #ffe4e9 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            color: #4a2e3b;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border-radius: 48px;
+            padding: 40px 35px;
+            width: 100%;
+            max-width: 550px;
+            box-shadow: 0 25px 45px -12px rgba(201, 120, 140, 0.4),
+                        0 2px 8px rgba(255, 240, 245, 0.6);
+            border: 1px solid rgba(255, 220, 230, 0.6);
+        }
+        h1 {
+            text-align: center;
+            font-weight: 500;
+            font-size: 2.2rem;
+            margin: 0 0 8px 0;
+            letter-spacing: 2px;
+            color: #b3546b;
+            text-shadow: 2px 2px 4px rgba(255, 200, 215, 0.8);
+        }
+        .sub {
+            text-align: center;
+            font-size: 0.95rem;
+            color: #a55b6e;
+            margin-bottom: 30px;
+            font-style: italic;
+        }
+        .control-group {
+            margin-bottom: 28px;
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #6b3f4c;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+        }
+        select, input[type="range"] {
+            width: 100%;
+            padding: 12px 18px;
+            border: 1px solid #ffd9e2;
+            border-radius: 50px;
+            background: rgba(255, 245, 248, 0.9);
+            font-size: 1rem;
+            color: #4f2d39;
+            outline: none;
+            transition: 0.2s;
+            box-shadow: inset 0 2px 5px rgba(255, 210, 220, 0.3);
+        }
+        select {
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23b3546b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 18px center;
+        }
+        select:focus, input[type="range"]:focus {
+            border-color: #d47b94;
+            box-shadow: 0 0 0 4px #ffdae4;
+        }
+        .slider-value {
+            display: inline-block;
+            margin-left: 15px;
+            font-weight: 600;
+            color: #b3546b;
+            background: #ffeef2;
+            padding: 5px 16px;
+            border-radius: 40px;
+            font-size: 0.95rem;
+        }
+        .test-area {
+            display: flex;
+            gap: 12px;
+            margin: 25px 0 18px;
+        }
+        .test-area input {
+            flex: 1;
+            padding: 15px 22px;
+            border: 1px solid #ffcbd8;
+            border-radius: 50px;
+            font-size: 1rem;
+            background: #fff9fb;
+        }
+        .test-area button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 50px;
+            background: #d36b86;
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 8px 18px -6px #b3546b;
+        }
+        .test-area button:hover {
+            background: #c25672;
+            transform: scale(1.02);
+        }
+        .info {
+            background: #fff0f4;
+            padding: 15px 20px;
+            border-radius: 30px;
+            border-left: 6px solid #d47b94;
+            font-size: 0.95rem;
+            color: #5c3643;
+            margin-top: 20px;
+        }
+        .info strong {
+            color: #b34a64;
+        }
+        .button-group {
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .button-group button {
+            background: none;
+            border: 2px solid #d47b94;
+            padding: 12px 28px;
+            border-radius: 50px;
+            color: #b3546b;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            background: rgba(255, 245, 248, 0.7);
+        }
+        .button-group button:hover {
+            background: #d47b94;
+            color: white;
+        }
+        .current-voice {
+            font-weight: 600;
+            color: #a1425b;
+            background: #ffe2e9;
+            padding: 6px 16px;
+            border-radius: 40px;
+            display: inline-block;
+            margin-top: 8px;
+        }
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #a55b6e;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h1>💬 女神音色试音间</h1>
+    <div class="sub">调出你心中的温柔性感</div>
+
+    <div class="control-group">
+        <label>🎙️ 选择语音</label>
+        <select id="voiceSelect"></select>
+        <div id="currentVoiceName" class="current-voice">——</div>
+    </div>
+
+    <div class="control-group">
+        <label>✨ 音高 <span id="pitchValue" class="slider-value">1.2</span></label>
+        <input type="range" id="pitch" min="0.5" max="2" step="0.1" value="1.2">
+    </div>
+
+    <div class="control-group">
+        <label>📢 语速 <span id="rateValue" class="slider-value">0.95</span></label>
+        <input type="range" id="rate" min="0.5" max="2" step="0.1" value="0.95">
+    </div>
+
+    <div class="test-area">
+        <input type="text" id="testText" value="你好，我是你的专属语音助手，今天想听什么？" placeholder="输入要说的话">
+        <button id="speakBtn">🔊 试听</button>
+    </div>
+
+    <div class="info">
+        <strong>💡 提示</strong><br>
+        1. 滑动滑块实时调整音高/语速。<br>
+        2. 在下拉列表中选择不同的中文语音试听。<br>
+        3. 找到满意的组合后，记下语音名称和参数，到主应用 <code>speak</code> 函数中设置。
+    </div>
+
+    <div class="button-group">
+        <button id="stopBtn">⏹️ 停止</button>
+        <button id="defaultBtn">↺ 重置默认</button>
+    </div>
+
+    <footer>
+        ⚡ 建议使用 Edge / Chrome 浏览器以获得最佳语音效果
+    </footer>
+</div>
+
+<script>
+    (function() {
+        // DOM 元素
+        const voiceSelect = document.getElementById('voiceSelect');
+        const pitchInput = document.getElementById('pitch');
+        const rateInput = document.getElementById('rate');
+        const pitchSpan = document.getElementById('pitchValue');
+        const rateSpan = document.getElementById('rateValue');
+        const testText = document.getElementById('testText');
+        const speakBtn = document.getElementById('speakBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const defaultBtn = document.getElementById('defaultBtn');
+        const currentVoiceNameSpan = document.getElementById('currentVoiceName');
+
+        // 存储语音列表
+        let voices = [];
+
+        // 初始化语音列表（需要等待 voiceschanged 事件）
+        function loadVoices() {
+            voices = window.speechSynthesis.getVoices();
+            const zhVoices = voices.filter(v => v.lang.includes('zh'));
+
+            // 清空并填充下拉框
+            voiceSelect.innerHTML = '';
+            if (zhVoices.length === 0) {
+                voiceSelect.innerHTML = '<option value="">未找到中文语音</option>';
+                return;
+            }
+
+            zhVoices.forEach((voice, index) => {
+                const option = document.createElement('option');
+                option.value = voice.name;
+                option.textContent = `${voice.name} (${voice.lang})`;
+                voiceSelect.appendChild(option);
+            });
+
+            // 尝试默认选择一个温柔的声音（按名称关键词）
+            const preferredNames = ['Yaoyao', 'Mei-Jia', 'Ting-Ting', 'Google 普通话', 'Xiaoxiao', 'Xiaoqiu'];
+            let selectedIndex = 0; // 默认第一个
+            for (let i = 0; i < zhVoices.length; i++) {
+                const name = zhVoices[i].name;
+                if (preferredNames.some(p => name.includes(p))) {
+                    selectedIndex = i;
+                    break;
+                }
+            }
+            voiceSelect.selectedIndex = selectedIndex;
+            updateCurrentVoiceName();
+        }
+
+        // 更新当前选择的语音名称显示
+        function updateCurrentVoiceName() {
+            const selectedOption = voiceSelect.options[voiceSelect.selectedIndex];
+            if (selectedOption) {
+                currentVoiceNameSpan.textContent = selectedOption.textContent;
+            } else {
+                currentVoiceNameSpan.textContent = '——';
+            }
+        }
+
+        // 获取当前选中的语音对象
+        function getSelectedVoice() {
+            const selectedName = voiceSelect.value;
+            return voices.find(v => v.name === selectedName) || null;
+        }
+
+        // 播放测试语音
+        function speak() {
+            const text = testText.value.trim();
+            if (!text) {
+                alert('请输入要朗读的文字');
+                return;
+            }
+
+            // 取消任何正在播放的语音
+            window.speechSynthesis.cancel();
+
+            const utterance = new SpeechSynthesisUtterance(text);
+            const selectedVoice = getSelectedVoice();
+            if (selectedVoice) {
+                utterance.voice = selectedVoice;
+            } else {
+                // 如果没有选择具体语音，尝试找一个中文女声
+                const fallback = voices.find(v => v.lang.includes('zh') && v.name.includes('Female'));
+                if (fallback) utterance.voice = fallback;
+            }
+
+            utterance.lang = 'zh-CN';
+            utterance.pitch = parseFloat(pitchInput.value);
+            utterance.rate = parseFloat(rateInput.value);
+            utterance.volume = 1;
+
+            // 播放
+            window.speechSynthesis.speak(utterance);
+        }
+
+        // 停止播放
+        function stop() {
+            window.speechSynthesis.cancel();
+        }
+
+        // 重置为默认参数（音高1.2，语速0.95）
+        function resetDefaults() {
+            pitchInput.value = '1.2';
+            rateInput.value = '0.95';
+            pitchSpan.textContent = '1.2';
+            rateSpan.textContent = '0.95';
+            // 不重置语音选择，保留用户选择
+        }
+
+        // 更新滑块数值显示
+        pitchInput.addEventListener('input', function() {
+            pitchSpan.textContent = this.value;
+        });
+        rateInput.addEventListener('input', function() {
+            rateSpan.textContent = this.value;
+        });
+
+        // 语音选择变化时更新名称
+        voiceSelect.addEventListener('change', updateCurrentVoiceName);
+
+        // 按钮事件
+        speakBtn.addEventListener('click', speak);
+        stopBtn.addEventListener('click', stop);
+        defaultBtn.addEventListener('click', resetDefaults);
+
+        // 按回车键也可以试听
+        testText.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                speak();
+            }
+        });
+
+        // 加载语音（注意：需要在onload和voiceschanged事件中都调用）
+        if (window.speechSynthesis) {
+            // 立即尝试（可能还没加载完）
+            setTimeout(() => {
+                loadVoices();
+            }, 100);
+            // 监听voiceschanged事件
+            window.speechSynthesis.onvoiceschanged = function() {
+                loadVoices();
+            };
+        } else {
+            alert('您的浏览器不支持语音合成');
+        }
+    })();
+</script>
+</body>
+</html>
