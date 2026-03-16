@@ -11,7 +11,7 @@
     <!-- SheetJS 用于导出 XLSX -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* ================== 基础样式 ================== */
+        /* 样式与之前相同，为了节省篇幅已省略，实际使用时请保留完整样式 */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -115,8 +115,6 @@
         .btn-warning { background: #f59e0b; color: white; }
         .btn-danger { background: #ef4444; color: white; }
         .btn-sm { padding: 8px 16px; font-size: 0.9rem; }
-
-        /* ================== 扫描器 ================== */
         .scanner-container {
             width: 100%;
             border-radius: 24px;
@@ -173,7 +171,6 @@
             50% { transform: translateY(150%); }
             100% { transform: translateY(-150%); }
         }
-
         .scanner-controls { display: flex; gap: 12px; margin: 16px 0; justify-content: center; flex-wrap: wrap; }
         .manual-section { display: flex; gap: 12px; margin: 20px 0; justify-content: center; flex-wrap: wrap; }
         .note-section {
@@ -205,7 +202,6 @@
         }
         .lock-toggle.locked { color: #0284c7; border-color: #0284c7; background: #e0f2fe; }
         .lock-toggle.unlocked { color: #94a3b8; }
-
         .result-card {
             background: #e0f2fe;
             padding: 20px;
@@ -231,7 +227,6 @@
             font-size: 0.7rem;
             margin-left: 6px;
         }
-
         .stats-panel {
             background: #f8fafc;
             border-radius: 24px;
@@ -253,7 +248,6 @@
             border-radius: 40px;
             border: 1px solid #e2e8f0;
         }
-
         .toolbar {
             display: flex;
             flex-wrap: wrap;
@@ -300,7 +294,6 @@
             color: white;
             border-color: #0284c7;
         }
-
         table {
             width: 100%;
             border-collapse: collapse;
@@ -326,7 +319,6 @@
         .copy-btn { color: #0284c7; }
         .delete-btn { color: #ef4444; }
         .export-btn { background: #0f172a; color: white; }
-
         .pagination {
             display: flex;
             gap: 8px;
@@ -345,7 +337,6 @@
             border: 1px solid #e2e8f0;
         }
         .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
-
         .toast-message {
             position: fixed;
             top: 20px;
@@ -364,7 +355,6 @@
         .toast-message.success { background: #10b981; }
         .toast-message.error { background: #ef4444; }
         .toast-message.warning { background: #f59e0b; }
-
         .scan-toast {
             position: fixed;
             top: 100px;
@@ -379,7 +369,6 @@
             transition: opacity 0.3s;
         }
         .scan-toast.show { opacity: 1; }
-
         .modal {
             display: none;
             position: fixed;
@@ -410,7 +399,6 @@
             margin-bottom: 16px;
         }
         .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
-
         .test-sound { margin: 12px 0; text-align: center; }
         .test-sound button {
             background: #f1f5f9;
@@ -419,7 +407,6 @@
             padding: 10px 28px;
             cursor: pointer;
         }
-
         .auth-container {
             max-width: 400px;
             margin: 40px auto;
@@ -457,11 +444,9 @@
         }
         .tab-btn.active { background: #e0f2fe; color: #0369a1; }
         .auth-footer { text-align: center; margin-top: 20px; cursor: pointer; color: #0284c7; }
-
         .photo-thumb { max-width: 60px; max-height: 60px; cursor: pointer; border-radius: 8px; transition: 0.2s; }
         .photo-thumb:hover { opacity: 0.8; }
         .empty-search { text-align: center; padding: 30px; color: #94a3b8; font-size: 1rem; }
-
         @media (max-width: 640px) {
             .stats-panel { flex-direction: column; align-items: flex-start; }
             .toolbar { flex-direction: column; align-items: stretch; }
@@ -795,18 +780,39 @@
     }
     soundToggleBtn.addEventListener('click', toggleSound);
 
-    // ================== 语音朗读 ==================
+    // ================== 语音朗读（增强版）==================
+    let voicesLoaded = false;
+    let availableVoices = [];
+    function loadVoices() {
+        availableVoices = window.speechSynthesis.getVoices();
+        voicesLoaded = true;
+    }
+    if (window.speechSynthesis) {
+        loadVoices();
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+    }
+
     function speak(text) {
         if (!speechEnabled) return;
-        if (!window.speechSynthesis) return;
-
-        const voices = window.speechSynthesis.getVoices();
-        let preferredVoice = voices.find(v => v.lang.includes('zh') && v.name.includes('Google 普通话'));
-        if (!preferredVoice) {
-            preferredVoice = voices.find(v => v.lang.includes('zh') && v.name.includes('Female'));
+        if (!window.speechSynthesis) {
+            console.warn('浏览器不支持语音合成');
+            return;
         }
+        if (!voicesLoaded) {
+            // 如果语音还没加载完，延迟一下再试
+            setTimeout(() => speak(text), 200);
+            return;
+        }
+
+        // 优先选择 Google 普通话
+        let preferredVoice = availableVoices.find(v => v.lang.includes('zh') && v.name.includes('Google 普通话'));
+        // 其次选择任何中文女性声音
         if (!preferredVoice) {
-            preferredVoice = voices.find(v => v.lang.includes('zh'));
+            preferredVoice = availableVoices.find(v => v.lang.includes('zh') && v.name.includes('Female'));
+        }
+        // 最后选第一个中文声音
+        if (!preferredVoice) {
+            preferredVoice = availableVoices.find(v => v.lang.includes('zh'));
         }
 
         window.speechSynthesis.cancel();
@@ -815,7 +821,9 @@
         utterance.rate = 1.2;
         utterance.pitch = 1.0;
         utterance.volume = 1;
-        if (preferredVoice) utterance.voice = preferredVoice;
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+        }
         window.speechSynthesis.speak(utterance);
     }
     testSoundBtn.addEventListener('click', () => { speak('测试声音'); showToast('测试声音已播放', 'info'); });
@@ -1354,7 +1362,7 @@
         }
     }
 
-    // ================== 处理扫码结果（暂停/恢复，确保恢复）==================
+    // ================== 处理扫码结果（修复黑屏和语音问题）==================
     async function handleTrackingNumber(trackingNumber) {
         // 如果该单号正在处理中，直接忽略本次触发
         if (window.processingTrackingNumbers.has(trackingNumber)) {
@@ -1363,26 +1371,17 @@
         }
 
         const now = Date.now();
-        // 原有防重：5秒内相同单号忽略
+        // 防重：5秒内相同单号忽略
         if (trackingNumber === lastScannedCode && now - lastScanTime < 5000) {
-            speak('重复'); vibrate('repeat');
+            speak('重复');
+            vibrate('repeat');
             showToast('⚠️ 5秒内重复扫码，已忽略', 'warning');
             return;
         }
 
         // 标记开始处理
         window.processingTrackingNumbers.add(trackingNumber);
-
-        // 如果当前正在扫码，暂停解码以避免处理期间的新触发
         let wasScanning = isScanning;
-        if (wasScanning) {
-            try {
-                Quagga.pause();
-                console.log('扫码已暂停（处理条码）');
-            } catch(e) {
-                console.warn('暂停扫码失败', e);
-            }
-        }
 
         try {
             lastScannedCode = trackingNumber;
@@ -1390,7 +1389,8 @@
 
             const carrier = detectCarrier(trackingNumber);
             if (!carrier) {
-                speak('错误'); vibrate('error');
+                speak('错误');
+                vibrate('error');
                 showToast('❌ 无效的快递单号', 'error');
                 currentResult.style.display = 'none';
                 return;
@@ -1400,8 +1400,19 @@
             if (!limitCheck.allowed) {
                 const userConfirm = confirm(`⚠️ 限制提醒：${limitCheck.reason}。是否仍然保存？`);
                 if (!userConfirm) {
-                    speak('已取消'); showToast('保存已取消', 'warning');
+                    speak('已取消');
+                    showToast('保存已取消', 'warning');
                     return;
+                }
+            }
+
+            // 只有有效条码才暂停扫码（避免暂停后不恢复）
+            if (wasScanning) {
+                try {
+                    Quagga.pause();
+                    console.log('扫码已暂停（处理条码）');
+                } catch(e) {
+                    console.warn('暂停扫码失败', e);
                 }
             }
 
@@ -1428,10 +1439,12 @@
             updateSyncStatusUI();
 
             if (isDuplicate) {
-                speak('重复'); vibrate('repeat');
+                speak('重复');
+                vibrate('repeat');
                 showToast('⚠️ 重复扫描，已保存', 'warning');
             } else {
-                speak('成功'); vibrate('success');
+                speak('成功');
+                vibrate('success');
                 showToast('✅ 扫描成功', 'success');
             }
             showScanToast(trackingNumber);
@@ -1440,10 +1453,11 @@
             carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
             scannedAtSpan.innerText = new Date().toLocaleString();
             duplicateHint.innerText = isDuplicate ? `⏰ 上次扫描：${lastTime.toLocaleString()}` : '';
+
         } finally {
             // 移除处理标记
             window.processingTrackingNumbers.delete(trackingNumber);
-            // 恢复扫码（如果之前是运行的）
+            // 恢复扫码（如果之前暂停了）
             if (wasScanning) {
                 try {
                     Quagga.resume();
@@ -1653,7 +1667,7 @@
     loadPendingFromStorage();
     loadSoundPreference();
     if (window.speechSynthesis) {
-        window.speechSynthesis.getVoices();
+        window.speechSynthesis.getVoices(); // 触发加载
     }
 </script>
 </body>
