@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>快递扫码 · 后台管理</title>
+    <title>快递扫码 · 拍照版</title>
+    <!-- QuaggaJS 扫码库 -->
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <!-- Supabase JS 客户端 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- SheetJS 用于导出 XLSX -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
+        /* 样式与之前相同，省略以节省篇幅，实际使用时请保留 */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -19,7 +22,7 @@
             padding: 12px;
             color: #1e293b;
         }
-        .app { max-width: 1400px; width: 100%; }
+        .app { max-width: 1200px; width: 100%; }
         .card {
             background: white;
             border-radius: 32px;
@@ -55,6 +58,43 @@
             border-radius: 60px;
         }
         .status-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: #f1f5f9;
+            padding: 8px 20px;
+            border-radius: 40px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            font-weight: 500;
+        }
+        .sync-status.online { color: #10b981; }
+        .sync-status.offline { color: #ef4444; }
+        .sync-status.syncing { color: #f59e0b; }
+        .local-mode-badge {
+            background: #f1f5f9;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            color: #475569;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .sound-toggle {
+            background: #f1f5f9;
+            border: none;
+            border-radius: 40px;
+            padding: 8px 20px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .sound-toggle.on { color: #0284c7; }
+        .sound-toggle.off { color: #94a3b8; }
         .btn {
             padding: 12px 24px;
             border: none;
@@ -71,108 +111,177 @@
             gap: 8px;
         }
         .btn-primary { background: #0284c7; color: white; }
-        .btn-primary:hover { background: #0369a1; }
         .btn-success { background: #10b981; color: white; }
-        .btn-success:hover { background: #059669; }
+        .btn-warning { background: #f59e0b; color: white; }
         .btn-danger { background: #ef4444; color: white; }
-        .btn-danger:hover { background: #dc2626; }
         .btn-sm { padding: 8px 16px; font-size: 0.9rem; }
-        .tab-bar {
+        .scanner-container {
+            width: 100%;
+            border-radius: 24px;
+            overflow: hidden;
+            background: #0f172a;
+            margin: 20px 0;
+            box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1);
+        }
+        #interactive.viewport {
+            position: relative;
+            width: 100%;
+            max-height: 400px;
+            overflow: hidden;
+        }
+        #interactive.viewport video, #interactive.viewport canvas {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .scanner-controls { display: flex; gap: 12px; margin: 16px 0; justify-content: center; flex-wrap: wrap; }
+        .manual-section { display: flex; gap: 12px; margin: 20px 0; justify-content: center; flex-wrap: wrap; }
+        .note-section {
             display: flex;
             gap: 12px;
-            margin-bottom: 24px;
-            border-bottom: 1px solid #e2e8f0;
-            padding-bottom: 12px;
-        }
-        .tab-btn {
-            background: none;
-            border: none;
-            padding: 8px 24px;
-            font-size: 1rem;
-            border-radius: 40px;
-            cursor: pointer;
-            color: #64748b;
-            transition: all 0.2s;
-            font-weight: 600;
-        }
-        .tab-btn.active {
-            background: #e0f2fe;
-            color: #0369a1;
-        }
-        .filter-bar {
-            display: flex;
+            margin: 16px 0;
+            align-items: center;
             flex-wrap: wrap;
-            gap: 16px;
-            align-items: flex-end;
-            margin: 20px 0;
             background: #f8fafc;
-            padding: 20px;
-            border-radius: 30px;
-            border: 1px solid #e2e8f0;
-        }
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-            min-width: 150px;
-            flex: 1 1 auto;
-        }
-        .filter-group label {
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: #475569;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .filter-group input, .filter-group select {
             padding: 12px 16px;
+            border-radius: 60px;
+        }
+        .note-section input {
+            flex: 1 1 180px;
+            min-width: 150px;
+            padding: 12px 18px;
             border: 1px solid #e2e8f0;
             border-radius: 40px;
             font-size: 1rem;
             background: white;
         }
-        .filter-actions {
+        .lock-toggle {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 40px;
+            padding: 8px 18px;
+            font-size: 1.2rem;
+            cursor: pointer;
+        }
+        .lock-toggle.locked { color: #0284c7; border-color: #0284c7; background: #e0f2fe; }
+        .lock-toggle.unlocked { color: #94a3b8; }
+        .result-card {
+            background: #e0f2fe;
+            padding: 20px;
+            border-radius: 24px;
+            margin: 20px 0;
+            border-left: 6px solid #0284c7;
+        }
+        .result-card.invalid { border-left-color: #ef4444; background: #fee2e2; }
+        .carrier-badge {
+            background: #0284c7;
+            color: white;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            display: inline-block;
+            font-weight: 600;
+        }
+        .pending-badge {
+            background: #f59e0b;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            margin-left: 6px;
+        }
+        .stats-panel {
+            background: #f8fafc;
+            border-radius: 24px;
+            padding: 20px;
+            margin: 20px 0;
             display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            align-items: center;
+            border: 1px solid #e2e8f0;
+        }
+        .stat-item { display: flex; flex-direction: column; }
+        .stat-label { font-size: 0.85rem; color: #64748b; text-transform: uppercase; }
+        .stat-value { font-size: 1.8rem; font-weight: 700; color: #0f172a; }
+        .carrier-stats { display: flex; flex-wrap: wrap; gap: 12px; }
+        .carrier-stat {
+            background: white;
+            padding: 6px 16px;
+            border-radius: 40px;
+            border: 1px solid #e2e8f0;
+        }
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
             gap: 12px;
             align-items: center;
+            margin: 20px 0;
+            background: #f8fafc;
+            padding: 16px 20px;
+            border-radius: 60px;
+            border: 1px solid #e2e8f0;
+        }
+        .search-box {
+            flex: 1 1 200px;
+            min-width: 180px;
+            padding: 12px 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 40px;
+            font-size: 1rem;
+            background: white;
+        }
+        .clear-select {
+            padding: 12px 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 40px;
+            font-size: 1rem;
+            background: white;
+        }
+        .data-source-switch {
+            display: flex;
+            gap: 8px;
             flex-wrap: wrap;
+        }
+        .data-source-switch button {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 40px;
+            background: white;
+            cursor: pointer;
+            font-weight: 500;
+            border: 1px solid #e2e8f0;
+        }
+        .data-source-switch button.active {
+            background: #0284c7;
+            color: white;
+            border-color: #0284c7;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin-top: 16px;
             font-size: 0.95rem;
-            min-width: 900px;
+            min-width: 800px;
             background: white;
             border-radius: 20px;
             overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.02);
         }
         th {
-            text-align: left;
             padding: 16px 12px;
             background: #f1f5f9;
-            color: #334155;
             font-weight: 600;
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            text-align: left;
         }
         td {
             padding: 14px 12px;
             border-bottom: 1px solid #e2e8f0;
-            background: white;
         }
-        tr:last-child td { border-bottom: none; }
         tr:nth-child(even) td { background: #fafafa; }
-        .photo-thumb {
-            max-width: 60px;
-            max-height: 60px;
-            cursor: pointer;
-            border-radius: 6px;
-            transition: 0.2s;
-        }
-        .photo-thumb:hover { opacity: 0.8; }
+        .copy-btn, .delete-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; }
+        .copy-btn { color: #0284c7; }
+        .delete-btn { color: #ef4444; }
+        .export-btn { background: #0f172a; color: white; }
         .pagination {
             display: flex;
             gap: 8px;
@@ -191,7 +300,6 @@
             border: 1px solid #e2e8f0;
         }
         .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .pagination span { font-size: 1rem; color: #475569; font-weight: 500; }
         .toast-message {
             position: fixed;
             top: 20px;
@@ -201,56 +309,29 @@
             color: white;
             padding: 12px 28px;
             border-radius: 50px;
-            font-size: 1rem;
             z-index: 2000;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2);
-            transition: opacity 0.3s;
             opacity: 0;
             pointer-events: none;
+            transition: opacity 0.3s;
         }
         .toast-message.show { opacity: 1; }
         .toast-message.success { background: #10b981; }
         .toast-message.error { background: #ef4444; }
-        .auth-container {
-            max-width: 400px;
-            margin: 40px auto;
-            background: white;
-            border-radius: 40px;
-            padding: 30px 24px;
-            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
-        }
-        .auth-title {
-            font-size: 1.8rem;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 8px;
-        }
-        .auth-subtitle {
-            text-align: center;
-            color: #64748b;
-            margin-bottom: 24px;
-        }
-        .auth-form {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-        .auth-form input {
-            padding: 16px 20px;
-            border: 1px solid #e2e8f0;
-            border-radius: 40px;
-            font-size: 1rem;
-            background: #f8fafc;
-        }
-        .error-msg { color: #dc2626; font-size: 0.9rem; margin-top: 8px; }
-        .admin-badge {
-            background: #0284c7;
+        .toast-message.warning { background: #f59e0b; }
+        .scan-toast {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
             color: white;
-            padding: 4px 12px;
-            border-radius: 40px;
-            font-size: 0.8rem;
-            margin-left: 8px;
+            padding: 14px 30px;
+            border-radius: 50px;
+            z-index: 2000;
+            opacity: 0;
+            transition: opacity 0.3s;
         }
+        .scan-toast.show { opacity: 1; }
         .modal {
             display: none;
             position: fixed;
@@ -271,28 +352,66 @@
             padding: 28px;
             max-width: 400px;
             width: 100%;
-            max-height: 90vh;
-            overflow-y: auto;
         }
-        .modal-content.large {
-            max-width: 90vw;
-            max-height: 90vh;
-            background: transparent;
-            box-shadow: none;
-        }
+        .modal-content.large { max-width: 90vw; max-height: 90vh; }
         .modal-content input {
             width: 100%;
             padding: 12px 16px;
             border: 1px solid #e2e8f0;
             border-radius: 40px;
-            font-size: 1rem;
             margin-bottom: 16px;
         }
-        .modal-buttons { display: flex; gap: 12px; justify-content: flex-end; }
-        .settings-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; margin-left: 8px; }
+        .test-sound { margin: 12px 0; text-align: center; }
+        .test-sound button {
+            background: #f1f5f9;
+            border: none;
+            border-radius: 40px;
+            padding: 10px 28px;
+            cursor: pointer;
+        }
+        .auth-container {
+            max-width: 400px;
+            margin: 40px auto;
+            background: white;
+            border-radius: 40px;
+            padding: 30px 24px;
+            box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05);
+        }
+        .auth-title { font-size: 1.8rem; font-weight: 700; text-align: center; margin-bottom: 8px; }
+        .auth-subtitle { text-align: center; color: #64748b; margin-bottom: 24px; }
+        .auth-form { display: flex; flex-direction: column; gap: 16px; }
+        .auth-form input {
+            padding: 16px 20px;
+            border: 1px solid #e2e8f0;
+            border-radius: 40px;
+            font-size: 1rem;
+            background: #f8fafc;
+        }
+        .error-msg { color: #dc2626; font-size: 0.9rem; margin-top: 8px; }
+        .tabs {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-bottom: 24px;
+        }
+        .tab-btn {
+            background: none;
+            border: none;
+            padding: 8px 24px;
+            font-size: 1rem;
+            border-radius: 40px;
+            cursor: pointer;
+            color: #64748b;
+            font-weight: 600;
+        }
+        .tab-btn.active { background: #e0f2fe; color: #0369a1; }
+        .auth-footer { text-align: center; margin-top: 20px; cursor: pointer; color: #0284c7; }
+        .photo-thumb { max-width: 60px; max-height: 60px; cursor: pointer; border-radius: 8px; transition: 0.2s; }
+        .photo-thumb:hover { opacity: 0.8; }
+        .empty-search { text-align: center; padding: 30px; color: #94a3b8; font-size: 1rem; }
         @media (max-width: 640px) {
-            .filter-bar { flex-direction: column; align-items: stretch; }
-            .filter-group { width: 100%; }
+            .stats-panel { flex-direction: column; align-items: flex-start; }
+            .toolbar { flex-direction: column; align-items: stretch; }
         }
     </style>
 </head>
@@ -300,704 +419,1050 @@
 <div class="app">
     <div class="card">
         <div class="header-row">
-            <h1>📊 快递扫码 · 后台管理</h1>
+            <h1>📦 快递扫码 · 拍照版</h1>
             <div class="status-bar">
-                <button id="logoutBtn" class="btn btn-sm" style="display: none;">退出登录</button>
+                <button id="soundToggleBtn" class="sound-toggle on" title="声音提醒">🔊 声音</button>
+                <div id="syncStatus" class="sync-status online" style="display: none;">🟢 在线</div>
+                <div id="localModeBadge" class="local-mode-badge" style="display: none;">📱 本地模式</div>
             </div>
+        </div>
+
+        <div id="userHeader" class="user-header" style="display: none;">
+            <div id="userInfo"></div>
+            <button id="logoutBtn" class="btn btn-sm">退出登录</button>
         </div>
 
         <!-- 认证区域 -->
         <div id="authArea" class="auth-container">
-            <div class="auth-title">后台管理</div>
-            <div class="auth-subtitle">登录后管理扫描数据</div>
+            <div class="auth-title">集派快递</div>
+            <div class="auth-subtitle">扫码录入快人一步</div>
+            <div class="tabs">
+                <button id="loginTab" class="tab-btn active">登录</button>
+                <button id="signupTab" class="tab-btn">注册</button>
+            </div>
             <div id="loginForm" class="auth-form">
                 <input type="email" id="loginEmail" placeholder="邮箱" required>
                 <input type="password" id="loginPassword" placeholder="密码" required>
                 <button id="loginBtn" class="btn btn-primary">登录</button>
                 <div id="loginError" class="error-msg"></div>
             </div>
+            <div id="signupForm" class="auth-form" style="display: none;">
+                <input type="text" id="signupUsername" placeholder="用户名（选填）">
+                <input type="email" id="signupEmail" placeholder="邮箱*" required>
+                <input type="password" id="signupPassword" placeholder="密码（至少6位）*" required>
+                <input type="password" id="signupConfirm" placeholder="确认密码*" required>
+                <button id="signupBtn" class="btn btn-primary">注册</button>
+                <div id="signupError" class="error-msg"></div>
+            </div>
+            <div class="auth-footer">
+                <span id="switchToSignup">还没有账号？立即注册→</span>
+                <span id="switchToLogin" style="display: none;">已有账号？立即登录</span>
+            </div>
+            <button id="localModeBtn" class="btn btn-secondary" style="width:100%; margin-top:20px; background:white; border:1px dashed #94a3b8;">📱 本地模式（无需登录）</button>
         </div>
 
-        <!-- 主管理区域（登录后显示） -->
+        <!-- 主应用区域 -->
         <div id="mainApp" style="display: none;">
-            <div class="user-header">
-                <div>
-                    <span id="userInfo"></span>
-                    <span id="adminFlag" class="admin-badge" style="display: none;">管理员</span>
+            <div class="scanner-container">
+                <div id="interactive" class="viewport"></div>
+            </div>
+            <div class="scanner-controls">
+                <button id="startScanBtn" class="btn btn-success">▶️ 开始扫码</button>
+                <button id="pauseScanBtn" class="btn btn-warning" style="display: none;">⏸️ 暂停扫码</button>
+            </div>
+
+            <div class="manual-section">
+                <button id="manualBtn" class="btn btn-primary">📝 手动输入</button>
+            </div>
+
+            <div class="note-section">
+                <input type="text" id="noteInput" placeholder="备注（可输可选）" list="noteOptionsDatalist">
+                <datalist id="noteOptionsDatalist"></datalist>
+                <button id="lockToggleBtn" class="lock-toggle unlocked" title="锁定备注">🔓 锁定</button>
+            </div>
+
+            <div class="test-sound">
+                <button id="testSoundBtn">🔊 测试声音</button>
+            </div>
+
+            <div id="currentResult" class="result-card" style="display: none;">
+                <h3>📌 最新扫描</h3>
+                <p><strong>单号：</strong> <span id="trackingNumber"></span></p>
+                <p><strong>快递公司：</strong> <span id="carrier"></span></p>
+                <p><strong>时间：</strong> <span id="scannedAt"></span></p>
+                <p id="duplicateHint" style="color: #f59e0b;"></p>
+                <p id="photoHint" style="color: #10b981; margin-top:8px;"></p>
+            </div>
+
+            <!-- 统计面板 -->
+            <div class="stats-panel" id="statsPanel">
+                <div class="stat-item"><span class="stat-label">总记录数</span><span class="stat-value" id="totalCount">0</span></div>
+                <div class="stat-item"><span class="stat-label">唯一单号</span><span class="stat-value" id="uniqueCount">0</span></div>
+                <div class="carrier-stats" id="carrierStats"></div>
+            </div>
+
+            <!-- 工具栏 -->
+            <div class="toolbar">
+                <button id="searchBtn" class="btn btn-primary">🔍 搜索</button>
+                <select id="clearRangeSelect" class="clear-select">
+                    <option value="session">本次扫码</option>
+                    <option value="day">最近一天</option>
+                    <option value="week">最近一周</option>
+                    <option value="all">全部</option>
+                </select>
+                <button id="clearRangeBtn" class="btn btn-danger">🗑️ 清空所选范围</button>
+                <div class="data-source-switch">
+                    <button id="dataSourceLocal" class="active">本地数据</button>
+                    <button id="dataSourceCloud" class="cloud-btn">云端数据</button>
+                    <button id="dataSourceAll">全部数据</button>
                 </div>
-                <div>
-                    <button id="settingsBtn" class="settings-btn" title="账户设置">⚙️</button>
+                <div style="display: flex; gap: 8px;">
+                    <button id="exportCsvBtn" class="btn export-btn">📥 CSV</button>
+                    <button id="exportXlsxBtn" class="btn btn-success">📊 XLSX</button>
                 </div>
             </div>
 
-            <!-- 选项卡：数据管理 / 用户管理（仅管理员可见） -->
-            <div class="tab-bar">
-                <button id="tabDataBtn" class="tab-btn active">📋 数据管理</button>
-                <button id="tabUsersBtn" class="tab-btn" style="display: none;">👥 用户管理</button>
+            <!-- 数据表格 -->
+            <div style="overflow-x: auto;">
+                <table id="historyTable">
+                    <thead><tr><th>单号</th><th>快递公司</th><th>首次扫描</th><th>最新扫描</th><th>次数</th><th>照片</th><th style="width:120px">操作</th></tr></thead>
+                    <tbody id="historyBody"></tbody>
+                </table>
             </div>
+            <p id="noDataMsg" style="color:#94a3b8; text-align:center; padding:30px;">暂无记录</p>
 
-            <!-- 数据管理面板 -->
-            <div id="dataPanel">
-                <div class="filter-bar">
-                    <div class="filter-group">
-                        <label>开始日期</label>
-                        <input type="datetime-local" id="filterStart">
-                    </div>
-                    <div class="filter-group">
-                        <label>结束日期</label>
-                        <input type="datetime-local" id="filterEnd">
-                    </div>
-                    <div class="filter-group">
-                        <label>备注包含</label>
-                        <input type="text" id="filterNote" placeholder="关键词">
-                    </div>
-                    <div class="filter-group">
-                        <label>快递公司</label>
-                        <select id="filterCarrier">
-                            <option value="">全部</option>
-                        </select>
-                    </div>
-                    <div class="filter-group" id="userFilterGroup">
-                        <label>用户 ID</label>
-                        <select id="filterUserId">
-                            <option value="">全部</option>
-                        </select>
-                    </div>
-                    <div class="filter-actions">
-                        <button id="applyFilterBtn" class="btn btn-primary">应用筛选</button>
-                        <button id="resetFilterBtn" class="btn">重置</button>
-                        <button id="exportBtn" class="btn btn-success">📥 导出 XLSX</button>
-                    </div>
-                </div>
-
-                <!-- 统计信息 -->
-                <div style="margin: 16px 0; font-size: 1rem; color: #475569;">
-                    共 <span id="totalCount">0</span> 条记录
-                </div>
-
-                <!-- 数据表格（含照片列） -->
-                <div style="overflow-x: auto;">
-                    <table id="dataTable">
-                        <thead>
-                            <tr>
-                                <th>单号</th>
-                                <th>快递公司</th>
-                                <th>扫描时间</th>
-                                <th>备注</th>
-                                <th>照片</th>
-                            </tr>
-                        </thead>
-                        <tbody id="tableBody"></tbody>
-                    </table>
-                </div>
-
-                <!-- 分页控件 -->
-                <div class="pagination" id="pagination">
-                    <button id="prevPageBtn" disabled>◀ 上一页</button>
-                    <span id="pageInfo">第 1 页 / 共 1 页</span>
-                    <button id="nextPageBtn" disabled>下一页 ▶</button>
-                </div>
-            </div>
-
-            <!-- 用户管理面板（初始隐藏，仅管理员可见） -->
-            <div id="usersPanel" style="display: none;">
-                <div class="filter-bar">
-                    <div class="filter-actions" style="margin-left: auto;">
-                        <button id="addUserBtn" class="btn btn-success">➕ 新增用户</button>
-                    </div>
-                </div>
-                <div style="overflow-x: auto;">
-                    <table id="usersTable">
-                        <thead>
-                            <tr>
-                                <th>邮箱</th>
-                                <th>创建时间</th>
-                                <th>最后登录</th>
-                                <th>操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="usersTableBody"></tbody>
-                    </table>
-                </div>
-                <p id="noUsersMsg" style="color:#94a3b8; text-align:center; padding:30px; display:none;">暂无用户</p>
-                <div class="pagination" id="usersPagination">
-                    <button id="prevUsersPageBtn" disabled>◀ 上一页</button>
-                    <span id="usersPageInfo">第 1 页 / 共 1 页</span>
-                    <button id="nextUsersPageBtn" disabled>下一页 ▶</button>
-                </div>
+            <!-- 分页 -->
+            <div class="pagination" id="pagination">
+                <button id="prevPageBtn" disabled>◀ 上一页</button>
+                <span id="pageInfo">第 1 页 / 共 1 页</span>
+                <button id="nextPageBtn" disabled>下一页 ▶</button>
             </div>
         </div>
+    </div>
+    <div class="footer-note">🔒 数据仅自己可见 · 离线自动同步 · 支持拍照上传</div>
+</div>
+
+<!-- 手动输入模态框 -->
+<div id="manualModal" class="modal">
+    <div class="modal-content">
+        <h3>📝 手动输入单号</h3>
+        <input type="text" id="manualModalInput" placeholder="单号" autocomplete="off">
+        <div class="modal-buttons"><button id="manualModalCancel" class="btn">取消</button><button id="manualModalConfirm" class="btn btn-primary">确认</button></div>
+    </div>
+</div>
+
+<!-- 搜索模态框（含结果列表，已移除扫码按钮） -->
+<div id="searchModal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+        <h3>🔍 搜索记录</h3>
+        <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <input type="text" id="searchInput" placeholder="单号" autocomplete="off" style="flex:1; padding:12px 16px; border:1px solid #e2e8f0; border-radius:40px;">
+            <button id="searchModalBtn" class="btn btn-primary">搜索</button>
+        </div>
+        <!-- 搜索结果列表 -->
+        <div id="searchResults" style="max-height: 400px; overflow-y: auto; border:1px solid #e2e8f0; border-radius:20px; padding:8px; margin-bottom:16px;"></div>
+        <!-- 结果分页 -->
+        <div class="pagination" id="searchPagination" style="margin-top:8px;">
+            <button id="searchPrevPageBtn" disabled>◀ 上一页</button>
+            <span id="searchPageInfo">第 1 页 / 共 1 页</span>
+            <button id="searchNextPageBtn" disabled>下一页 ▶</button>
+        </div>
+        <div class="modal-buttons">
+            <button id="searchModalCancel" class="btn">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 详情模态框 -->
+<div id="detailModal" class="modal">
+    <div class="modal-content" style="max-width: 600px;">
+        <h3 id="detailTitle">单号详情</h3>
+        <div id="detailList" style="max-height: 400px; overflow-y: auto; border:1px solid #e2e8f0; border-radius:20px; padding:8px;"></div>
+        <div class="modal-buttons"><button id="detailModalClose" class="btn btn-primary">关闭</button></div>
     </div>
 </div>
 
 <!-- 大图查看模态框 -->
 <div id="imageModal" class="modal">
-    <div class="modal-content large">
+    <div class="modal-content large" style="background: transparent; box-shadow: none;">
         <img id="largeImage" style="max-width: 100%; max-height: 90vh; margin: auto; display: block; border-radius: 16px;">
         <div style="text-align: center; margin-top: 16px;"><button id="closeImageBtn" class="btn btn-primary">关闭</button></div>
     </div>
 </div>
 
-<!-- 账户设置模态框（保持不变） -->
-<div id="settingsModal" class="modal">
-    <div class="modal-content">
-        <h3>账户设置</h3>
-        <label style="font-weight:600;">修改邮箱</label>
-        <input type="email" id="newEmail" placeholder="新邮箱">
-        <div style="margin: 20px 0; border-top:1px solid #e2e8f0;"></div>
-        <label style="font-weight:600;">修改密码</label>
-        <input type="password" id="oldPassword" placeholder="当前密码">
-        <input type="password" id="newPassword" placeholder="新密码（至少6位）">
-        <input type="password" id="confirmPassword" placeholder="确认新密码">
-        <div class="modal-buttons">
-            <button id="cancelSettingsBtn" class="btn">取消</button>
-            <button id="saveSettingsBtn" class="btn btn-primary">保存</button>
-        </div>
-    </div>
-</div>
-
-<!-- 新增/编辑用户模态框 -->
-<div id="userModal" class="modal">
-    <div class="modal-content">
-        <h3 id="userModalTitle">新增用户</h3>
-        <input type="email" id="userEmail" placeholder="邮箱">
-        <input type="password" id="userPassword" placeholder="密码（至少6位）">
-        <div class="modal-buttons">
-            <button id="cancelUserBtn" class="btn">取消</button>
-            <button id="saveUserBtn" class="btn btn-primary">保存</button>
-        </div>
-    </div>
-</div>
-
-<!-- 全局 Toast 提示 -->
+<!-- 全局提示 -->
 <div id="toast" class="toast-message"></div>
+<div id="scanToast" class="scan-toast"></div>
 
 <script>
     // ================== 配置 ==================
     const SUPABASE_URL = 'https://vmkpymrujtvguvmzcisc.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_RKS87lNw-yOvLeZ9PU2SEw_U-3mKNUu';
-    const ADMIN_EMAIL = 'admin@example.com';  // 管理员邮箱，可修改
-
     const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    let currentUser = null;
-    let allRecords = [];
-    let filteredRecords = [];
-    let currentPage = 1;
-    const pageSize = 20;
+    // 快递公司识别规则
+    const carrierRules = [
+        { name: '顺丰快递', regex: /^SF\d{13}$/i },
+        { name: '圆通快递', regex: /^YT\d{13}$/i },
+        { name: '中通快递', regex: /^(73|75|78)\d{11}$/ },
+        { name: '申通快递', regex: /^(777|772)\d{12}$/ },
+        { name: '韵达快递', regex: /^(46|43|31|32)\d{11,13}$/ },
+        { name: '极兔快递', regex: /^JT\d{13}$/i },
+        { name: 'EMS', regex: /^13\d{11}$/ },
+        { name: '邮政快递', regex: /^(98|82)\d{11}$/ }
+    ];
 
-    // 用户管理相关
-    let allUsers = [];
-    let usersCurrentPage = 1;
-    const usersPageSize = 20;
+    let currentUser = null;
+    let pendingRecords = [];
+    let isOnline = navigator.onLine;
+    let isScanning = false;
+    let lastScannedCode = '';
+    let lastScanTime = 0;
+    let allRecords = [];
+    let cloudData = [];
+    let sessionStartTime = null;
+    let cloudDataLoaded = false;
+    let speechEnabled = true;
+    let soundEnabled = true;
+    let noteLocked = false;
+    let lockedNote = '';
+    let noteOptions = [];
+    let currentPage = 1;
+    const pageSize = 10;
+    let groupedRecords = [];
+    let dataSourceMode = 'local';
+    let searchKeyword = '';
+    let isLocalMode = false;
+
+    // 搜索相关变量
+    let searchResults = [];
+    let searchCurrentPage = 1;
+    const searchPageSize = 10;
+
+    // 用于处理中单号标记，防止并发重复
+    if (!window.processingTrackingNumbers) {
+        window.processingTrackingNumbers = new Set();
+    }
 
     // DOM 元素
+    const syncStatusDiv = document.getElementById('syncStatus');
+    const localModeBadge = document.getElementById('localModeBadge');
     const authArea = document.getElementById('authArea');
     const mainApp = document.getElementById('mainApp');
+    const userHeader = document.getElementById('userHeader');
     const userInfoDiv = document.getElementById('userInfo');
-    const adminFlag = document.getElementById('adminFlag');
     const logoutBtn = document.getElementById('logoutBtn');
+    const loginTab = document.getElementById('loginTab');
+    const signupTab = document.getElementById('signupTab');
+    const loginForm = document.getElementById('loginForm');
+    const signupForm = document.getElementById('signupForm');
     const loginBtn = document.getElementById('loginBtn');
-    const loginEmail = document.getElementById('loginEmail');
-    const loginPassword = document.getElementById('loginPassword');
+    const signupBtn = document.getElementById('signupBtn');
     const loginError = document.getElementById('loginError');
-
-    const tabDataBtn = document.getElementById('tabDataBtn');
-    const tabUsersBtn = document.getElementById('tabUsersBtn');
-    const dataPanel = document.getElementById('dataPanel');
-    const usersPanel = document.getElementById('usersPanel');
-
-    const filterStart = document.getElementById('filterStart');
-    const filterEnd = document.getElementById('filterEnd');
-    const filterNote = document.getElementById('filterNote');
-    const filterCarrier = document.getElementById('filterCarrier');
-    const filterUserId = document.getElementById('filterUserId');
-    const applyFilterBtn = document.getElementById('applyFilterBtn');
-    const resetFilterBtn = document.getElementById('resetFilterBtn');
-    const exportBtn = document.getElementById('exportBtn');
+    const signupError = document.getElementById('signupError');
+    const switchToSignup = document.getElementById('switchToSignup');
+    const switchToLogin = document.getElementById('switchToLogin');
+    const localModeBtn = document.getElementById('localModeBtn');
+    const manualBtn = document.getElementById('manualBtn');
+    const noteInput = document.getElementById('noteInput');
+    const noteOptionsDatalist = document.getElementById('noteOptionsDatalist');
+    const lockToggleBtn = document.getElementById('lockToggleBtn');
+    const testSoundBtn = document.getElementById('testSoundBtn');
+    const currentResult = document.getElementById('currentResult');
+    const trackingSpan = document.getElementById('trackingNumber');
+    const carrierSpan = document.getElementById('carrier');
+    const scannedAtSpan = document.getElementById('scannedAt');
+    const duplicateHint = document.getElementById('duplicateHint');
+    const photoHint = document.getElementById('photoHint');
+    const historyBody = document.getElementById('historyBody');
+    const noDataMsg = document.getElementById('noDataMsg');
+    const exportCsvBtn = document.getElementById('exportCsvBtn');
+    const exportXlsxBtn = document.getElementById('exportXlsxBtn');
+    const startScanBtn = document.getElementById('startScanBtn');
+    const pauseScanBtn = document.getElementById('pauseScanBtn');
+    const searchBtn = document.getElementById('searchBtn');
+    const clearRangeSelect = document.getElementById('clearRangeSelect');
+    const clearRangeBtn = document.getElementById('clearRangeBtn');
     const totalCountSpan = document.getElementById('totalCount');
-    const tableBody = document.getElementById('tableBody');
-    const prevPageBtn = document.getElementById('prevPageBtn');
-    const nextPageBtn = document.getElementById('nextPageBtn');
-    const pageInfo = document.getElementById('pageInfo');
-
-    const addUserBtn = document.getElementById('addUserBtn');
-    const usersTableBody = document.getElementById('usersTableBody');
-    const noUsersMsg = document.getElementById('noUsersMsg');
-    const prevUsersPageBtn = document.getElementById('prevUsersPageBtn');
-    const nextUsersPageBtn = document.getElementById('nextUsersPageBtn');
-    const usersPageInfo = document.getElementById('usersPageInfo');
-    const userModal = document.getElementById('userModal');
-    const userModalTitle = document.getElementById('userModalTitle');
-    const userEmail = document.getElementById('userEmail');
-    const userPassword = document.getElementById('userPassword');
-    const cancelUserBtn = document.getElementById('cancelUserBtn');
-    const saveUserBtn = document.getElementById('saveUserBtn');
-
-    const settingsBtn = document.getElementById('settingsBtn');
-    const settingsModal = document.getElementById('settingsModal');
-    const newEmail = document.getElementById('newEmail');
-    const oldPassword = document.getElementById('oldPassword');
-    const newPassword = document.getElementById('newPassword');
-    const confirmPassword = document.getElementById('confirmPassword');
-    const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
-    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-
+    const uniqueCountSpan = document.getElementById('uniqueCount');
+    const carrierStatsDiv = document.getElementById('carrierStats');
+    const toast = document.getElementById('toast');
+    const soundToggleBtn = document.getElementById('soundToggleBtn');
+    const scanToast = document.getElementById('scanToast');
+    const manualModal = document.getElementById('manualModal');
+    const manualModalInput = document.getElementById('manualModalInput');
+    const manualModalCancel = document.getElementById('manualModalCancel');
+    const manualModalConfirm = document.getElementById('manualModalConfirm');
+    const searchModal = document.getElementById('searchModal');
+    const searchInput = document.getElementById('searchInput');
+    const searchModalCancel = document.getElementById('searchModalCancel');
+    const searchModalBtn = document.getElementById('searchModalBtn');
+    const searchPrevPageBtn = document.getElementById('searchPrevPageBtn');
+    const searchNextPageBtn = document.getElementById('searchNextPageBtn');
+    const searchPageInfo = document.getElementById('searchPageInfo');
+    const searchResultsDiv = document.getElementById('searchResults');
+    const detailModal = document.getElementById('detailModal');
+    const detailTitle = document.getElementById('detailTitle');
+    const detailList = document.getElementById('detailList');
+    const detailModalClose = document.getElementById('detailModalClose');
     const imageModal = document.getElementById('imageModal');
     const largeImage = document.getElementById('largeImage');
     const closeImageBtn = document.getElementById('closeImageBtn');
+    const prevPageBtn = document.getElementById('prevPageBtn');
+    const nextPageBtn = document.getElementById('nextPageBtn');
+    const pageInfo = document.getElementById('pageInfo');
+    const dataSourceLocal = document.getElementById('dataSourceLocal');
+    const dataSourceCloud = document.getElementById('dataSourceCloud');
+    const dataSourceAll = document.getElementById('dataSourceAll');
 
-    const toast = document.getElementById('toast');
+    // ================== 声音开关 ==================
+    function loadSoundPreference() {
+        const saved = localStorage.getItem('soundEnabled');
+        if (saved !== null) soundEnabled = saved === 'true';
+        speechEnabled = soundEnabled;
+        updateSoundButton();
+    }
+    function saveSoundPreference() { localStorage.setItem('soundEnabled', soundEnabled); }
+    function toggleSound() {
+        soundEnabled = !soundEnabled;
+        speechEnabled = soundEnabled;
+        saveSoundPreference();
+        updateSoundButton();
+        showToast(soundEnabled ? '声音提醒已开启' : '声音提醒已关闭', 'success');
+        if (soundEnabled) speak('声音已开启');
+    }
+    function updateSoundButton() {
+        soundToggleBtn.className = soundEnabled ? 'sound-toggle on' : 'sound-toggle off';
+        soundToggleBtn.innerHTML = soundEnabled ? '🔊 声音' : '🔇 声音';
+    }
+    soundToggleBtn.addEventListener('click', toggleSound);
 
-    // ================== 辅助函数 ==================
+    // ================== 语音朗读（修复：每次获取语音列表，确保存在后备）==================
+    function speak(text) {
+        if (!speechEnabled) return;
+        if (!window.speechSynthesis) return;
+
+        // 确保语音列表已加载
+        const voices = window.speechSynthesis.getVoices();
+
+        // 优先选择 Google 普通话
+        let preferredVoice = voices.find(v => v.lang.includes('zh') && v.name.includes('Google 普通话'));
+        // 其次选择任何中文女性声音
+        if (!preferredVoice) {
+            preferredVoice = voices.find(v => v.lang.includes('zh') && v.name.includes('Female'));
+        }
+        // 最后选第一个中文声音
+        if (!preferredVoice) {
+            preferredVoice = voices.find(v => v.lang.includes('zh'));
+        }
+
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'zh-CN';
+        utterance.rate = 1.2;
+        utterance.pitch = 1.0;
+        utterance.volume = 1;
+        if (preferredVoice) {
+            utterance.voice = preferredVoice;
+        }
+        window.speechSynthesis.speak(utterance);
+    }
+    testSoundBtn.addEventListener('click', () => { speak('测试声音'); showToast('测试声音已播放', 'info'); });
+
+    // ================== 震动 ==================
+    function vibrate(type) {
+        if (!soundEnabled || !navigator.vibrate) return;
+        if (type === 'success') navigator.vibrate(50);
+        else if (type === 'repeat') navigator.vibrate(100);
+        else navigator.vibrate([100, 50, 100]);
+    }
+
     function showToast(message, type = 'success', duration = 2000) {
         toast.className = `toast-message show ${type}`;
         toast.textContent = message;
         setTimeout(() => toast.classList.remove('show'), duration);
     }
-
-    function escapeHtml(unsafe) {
-        return unsafe.replace(/[&<>"']/g, m => {
-            if(m === '&') return '&amp;';
-            if(m === '<') return '&lt;';
-            if(m === '>') return '&gt;';
-            if(m === '"') return '&quot;';
-            if(m === "'") return '&#039;';
-            return m;
-        });
+    function showScanToast(code) {
+        scanToast.className = 'scan-toast show';
+        scanToast.textContent = `📦 ${code}`;
+        setTimeout(() => scanToast.classList.remove('show'), 2000);
     }
 
-    function isAdmin(user) {
-        return user && user.email === ADMIN_EMAIL;
-    }
-
-    // ================== 加载数据（扫描记录）==================
-    async function loadData() {
-        if (!currentUser) return;
-        try {
-            let query = sbClient.from('scans').select('*').order('scanned_at', { ascending: false });
-            if (!isAdmin(currentUser)) {
-                query = query.eq('user_id', currentUser.id);
-            }
-            const { data, error } = await query;
-            if (error) throw error;
-            allRecords = data || [];
-            updateFilterOptions();
-            applyFilter();
-        } catch (err) {
-            console.error('加载数据失败', err);
-            showToast('加载数据失败', 'error');
-        }
-    }
-
-    function updateFilterOptions() {
-        const carriers = [...new Set(allRecords.map(r => r.carrier).filter(Boolean))];
-        carriers.sort();
-        filterCarrier.innerHTML = '<option value="">全部</option>' + carriers.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
-
-        if (isAdmin(currentUser)) {
-            const userIds = [...new Set(allRecords.map(r => r.user_id).filter(Boolean))];
-            userIds.sort();
-            filterUserId.innerHTML = '<option value="">全部</option>' + userIds.map(uid => `<option value="${escapeHtml(uid)}">${escapeHtml(uid)}</option>`).join('');
-            filterUserId.parentElement.style.display = 'block';
+    // ================== 备注锁定 ==================
+    function updateLockUI() {
+        if (noteLocked) {
+            lockToggleBtn.className = 'lock-toggle locked';
+            lockToggleBtn.innerHTML = '🔒 锁定';
+            noteInput.disabled = true;
+            noteInput.value = lockedNote;
         } else {
-            filterUserId.parentElement.style.display = 'none';
+            lockToggleBtn.className = 'lock-toggle unlocked';
+            lockToggleBtn.innerHTML = '🔓 锁定';
+            noteInput.disabled = false;
+            noteInput.value = '';
         }
     }
+    function toggleLock() {
+        if (noteLocked) { noteLocked = false; }
+        else { lockedNote = noteInput.value; noteLocked = true; }
+        updateLockUI();
+        showToast(noteLocked ? '备注已锁定' : '备注已解锁', 'success');
+    }
+    function getCurrentNote() { return noteLocked ? lockedNote : noteInput.value; }
+    lockToggleBtn.addEventListener('click', toggleLock);
 
-    function applyFilter() {
-        let records = allRecords;
-        const start = filterStart.value ? new Date(filterStart.value) : null;
-        const end = filterEnd.value ? new Date(filterEnd.value) : null;
-        if (start) records = records.filter(r => new Date(r.scanned_at) >= start);
-        if (end) records = records.filter(r => new Date(r.scanned_at) <= end);
-        const noteKeyword = filterNote.value.trim().toLowerCase();
-        if (noteKeyword) records = records.filter(r => (r.notes || '').toLowerCase().includes(noteKeyword));
-        const carrier = filterCarrier.value;
-        if (carrier) records = records.filter(r => r.carrier === carrier);
-        if (isAdmin(currentUser)) {
-            const userId = filterUserId.value;
-            if (userId) records = records.filter(r => r.user_id === userId);
-        }
-        filteredRecords = records;
-        totalCountSpan.innerText = filteredRecords.length;
-        currentPage = 1;
-        renderPage();
+    // ================== 备注选项加载 ==================
+    async function loadNoteOptions() {
+        try {
+            const { data, error } = await sbClient.from('note_options').select('*').order('id');
+            if (error) throw error;
+            noteOptions = data || [];
+            noteOptionsDatalist.innerHTML = noteOptions.map(opt => `<option value="${opt.option_text}">`).join('');
+        } catch (err) { console.error('加载备注选项失败', err); }
     }
 
-    function resetFilter() {
-        filterStart.value = '';
-        filterEnd.value = '';
-        filterNote.value = '';
-        filterCarrier.value = '';
-        filterUserId.value = '';
-        applyFilter();
+    // ================== 手动输入 ==================
+    manualBtn.addEventListener('click', () => {
+        if (speechEnabled) speak('输入');
+        manualModalInput.value = '';
+        manualModal.classList.add('show');
+        manualModalInput.focus();
+    });
+    manualModalCancel.addEventListener('click', () => manualModal.classList.remove('show'));
+    manualModalConfirm.addEventListener('click', () => {
+        const code = manualModalInput.value.trim();
+        if (code) { handleTrackingNumber(code); manualModal.classList.remove('show'); }
+        else showToast('请输入单号', 'warning');
+    });
+    manualModalInput.addEventListener('keypress', e => { if (e.key === 'Enter') manualModalConfirm.click(); });
+    manualModal.addEventListener('click', e => { if (e.target === manualModal) manualModal.classList.remove('show'); });
+
+    // ================== 搜索（模态框内）==================
+    searchBtn.addEventListener('click', () => {
+        searchInput.value = '';
+        searchResultsDiv.innerHTML = '';
+        searchModal.classList.add('show');
+    });
+
+    function performSearch() {
+        const keyword = searchInput.value.trim().toLowerCase();
+        let filtered = allRecords.filter(r =>
+            r.tracking_number.toLowerCase().includes(keyword) ||
+            (r.carrier && r.carrier.toLowerCase().includes(keyword))
+        );
+        const groups = {};
+        filtered.forEach(rec => {
+            const num = rec.tracking_number;
+            if (!groups[num]) {
+                groups[num] = {
+                    tracking_number: num,
+                    records: [],
+                    carrier: rec.carrier,
+                    last_time: rec.scanned_at,
+                    count: 0
+                };
+            }
+            groups[num].records.push(rec);
+            if (new Date(rec.scanned_at) > new Date(groups[num].last_time)) {
+                groups[num].last_time = rec.scanned_at;
+                groups[num].carrier = rec.carrier;
+            }
+            groups[num].count++;
+        });
+        searchResults = Object.values(groups).sort((a,b) => new Date(b.last_time) - new Date(a.last_time));
+        searchCurrentPage = 1;
+        renderSearchResults();
     }
 
-    function renderPage() {
-        const totalPages = Math.ceil(filteredRecords.length / pageSize) || 1;
-        if (currentPage < 1) currentPage = 1;
-        if (currentPage > totalPages) currentPage = totalPages;
-        const start = (currentPage - 1) * pageSize;
-        const end = start + pageSize;
-        const pageRecords = filteredRecords.slice(start, end);
-        renderTable(pageRecords);
-        pageInfo.innerText = `第 ${currentPage} 页 / 共 ${totalPages} 页`;
-        prevPageBtn.disabled = currentPage <= 1;
-        nextPageBtn.disabled = currentPage >= totalPages;
-    }
-
-    function renderTable(records) {
-        if (records.length === 0) {
-            tableBody.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:30px;">暂无数据</td></tr>';
+    function renderSearchResults() {
+        if (searchResults.length === 0) {
+            searchResultsDiv.innerHTML = '<div class="empty-search">暂无匹配记录</div>';
+            searchPageInfo.innerText = '第 0 页 / 共 0 页';
+            searchPrevPageBtn.disabled = true;
+            searchNextPageBtn.disabled = true;
             return;
         }
-        tableBody.innerHTML = records.map(rec => {
+        const totalPages = Math.ceil(searchResults.length / searchPageSize) || 1;
+        if (searchCurrentPage < 1) searchCurrentPage = 1;
+        if (searchCurrentPage > totalPages) searchCurrentPage = totalPages;
+        const start = (searchCurrentPage - 1) * searchPageSize;
+        const end = start + searchPageSize;
+        const pageGroups = searchResults.slice(start, end);
+
+        searchResultsDiv.innerHTML = pageGroups.map(group => {
+            const hasPhoto = group.records.some(r => r.photo_url) ? '📸' : '';
+            return `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:12px; border-bottom:1px solid #e2e8f0;">
+                    <div>
+                        <div><strong>${escapeHtml(group.tracking_number)}</strong> ${hasPhoto}</div>
+                        <div>${escapeHtml(group.carrier)} | 共 ${group.count} 条 | 最新: ${new Date(group.last_time).toLocaleString()}</div>
+                    </div>
+                    <div>
+                        <button class="copy-btn" data-code="${escapeHtml(group.tracking_number)}">📋</button>
+                        <button class="detail-btn" data-number="${escapeHtml(group.tracking_number)}">📋 详情</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        searchResultsDiv.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                navigator.clipboard.writeText(e.target.dataset.code);
+                showToast('单号已复制');
+            });
+        });
+        searchResultsDiv.querySelectorAll('.detail-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const number = e.target.dataset.number;
+                const group = searchResults.find(g => g.tracking_number === number);
+                if (group) showDetailModal(number, group.records);
+            });
+        });
+
+        searchPageInfo.innerText = `第 ${searchCurrentPage} 页 / 共 ${totalPages} 页`;
+        searchPrevPageBtn.disabled = searchCurrentPage <= 1;
+        searchNextPageBtn.disabled = searchCurrentPage >= totalPages;
+    }
+
+    searchModalBtn.addEventListener('click', performSearch);
+    searchInput.addEventListener('keypress', e => { if (e.key === 'Enter') performSearch(); });
+    searchModalCancel.addEventListener('click', () => searchModal.classList.remove('show'));
+    searchModal.addEventListener('click', e => { if (e.target === searchModal) searchModal.classList.remove('show'); });
+
+    // 分页
+    searchPrevPageBtn.addEventListener('click', () => {
+        if (searchCurrentPage > 1) {
+            searchCurrentPage--;
+            renderSearchResults();
+        }
+    });
+    searchNextPageBtn.addEventListener('click', () => {
+        if (searchCurrentPage < Math.ceil(searchResults.length / searchPageSize)) {
+            searchCurrentPage++;
+            renderSearchResults();
+        }
+    });
+
+    // ================== 详情模态框（带图片放大，删除后强制刷新主表格）==================
+    function showDetailModal(trackingNumber, records) {
+        detailTitle.innerText = `单号详情 - ${trackingNumber}`;
+        detailList.innerHTML = '';
+        records.sort((a, b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+        records.forEach(rec => {
+            const div = document.createElement('div');
+            div.className = 'modal-list-item';
             let photoHtml = '';
             if (rec.photo_url) {
-                photoHtml = `<img src="${escapeHtml(rec.photo_url)}" class="photo-thumb" data-url="${escapeHtml(rec.photo_url)}" alt="照片">`;
-            } else {
-                photoHtml = '无';
+                photoHtml = `<img src="${rec.photo_url}" class="photo-thumb" data-url="${rec.photo_url}" style="max-width:60px; max-height:60px; margin-top:8px; cursor:pointer;">`;
             }
-            return `
-            <tr>
-                <td>${escapeHtml(rec.tracking_number)}</td>
-                <td>${escapeHtml(rec.carrier || '')}</td>
-                <td>${new Date(rec.scanned_at).toLocaleString()}</td>
-                <td>${escapeHtml(rec.notes || '')}</td>
-                <td>${photoHtml}</td>
-            </tr>
-        `}).join('');
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; padding:8px; border-bottom:1px solid #e2e8f0;">
+                    <div>
+                        <div>${new Date(rec.scanned_at).toLocaleString()}</div>
+                        <small>备注: ${rec.notes || '无'}</small>
+                        ${photoHtml}
+                    </div>
+                    <div>
+                        <button class="copy-btn" data-code="${escapeHtml(rec.tracking_number)}">📋</button>
+                        <button class="delete-btn" data-localid="${rec.localId || ''}" data-cloudid="${rec.id || ''}">🗑️</button>
+                    </div>
+                </div>
+            `;
+            detailList.appendChild(div);
+        });
 
-        // 绑定图片点击放大
-        document.querySelectorAll('.photo-thumb').forEach(img => {
+        detailList.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                navigator.clipboard.writeText(e.target.dataset.code).then(() => showToast('单号已复制'));
+            });
+        });
+
+        detailList.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.addEventListener('click', async e => {
+                const localId = e.target.dataset.localid;
+                const cloudId = e.target.dataset.cloudid;
+                if (confirm('确定删除这条记录？')) {
+                    const success = await deleteRecord(localId, cloudId);
+                    if (success) {
+                        detailModal.classList.remove('show');
+                        // 强制刷新主表格
+                        allRecords = [...pendingRecords];
+                        if (cloudDataLoaded) allRecords.push(...cloudData);
+                        groupedRecords = groupRecords(allRecords);
+                        renderPage();
+                        renderStats(allRecords);
+                        updateSyncStatusUI();
+                        showToast('记录已删除', 'success');
+                    }
+                }
+            });
+        });
+
+        detailList.querySelectorAll('.photo-thumb').forEach(img => {
             img.addEventListener('click', () => {
                 largeImage.src = img.dataset.url;
                 imageModal.classList.add('show');
             });
         });
+
+        detailModal.classList.add('show');
+    }
+    detailModalClose.addEventListener('click', () => detailModal.classList.remove('show'));
+    detailModal.addEventListener('click', e => { if (e.target === detailModal) detailModal.classList.remove('show'); });
+
+    // 关闭大图
+    closeImageBtn.addEventListener('click', () => imageModal.classList.remove('show'));
+    imageModal.addEventListener('click', e => { if (e.target === imageModal) imageModal.classList.remove('show'); });
+
+    // ================== 本地存储 ==================
+    const STORAGE_KEY = 'pending_scans';
+    function loadPendingFromStorage() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) { try { pendingRecords = JSON.parse(stored); } catch(e){ pendingRecords=[]; } }
+        else pendingRecords = [];
+    }
+    function savePendingToStorage() { localStorage.setItem(STORAGE_KEY, JSON.stringify(pendingRecords)); }
+    function addPendingRecord(record) {
+        const localId = Date.now() + '-' + Math.random().toString(36).substr(2,9);
+        pendingRecords.unshift({ ...record, localId, pending: true });
+        savePendingToStorage();
+        updateSyncStatusUI();
     }
 
-    // ================== 导出 XLSX（已移除照片列）==================
-    function exportToXLSX() {
-        if (filteredRecords.length === 0) {
-            showToast('没有数据可导出', 'warning');
+    // ================== 同步状态 ==================
+    function updateSyncStatusUI() {
+        if (isLocalMode) {
+            syncStatusDiv.style.display = 'none';
+            localModeBadge.style.display = 'flex';
             return;
         }
-        const data = filteredRecords.map(r => ({
-            '单号': r.tracking_number,
-            '快递公司': r.carrier || '',
-            '扫描时间': new Date(r.scanned_at).toLocaleString(),
-            '备注': r.notes || ''
-        }));
-        const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, '扫描记录');
-        XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
+        syncStatusDiv.style.display = 'flex';
+        localModeBadge.style.display = 'none';
+        if (!isOnline) syncStatusDiv.className = 'sync-status offline';
+        else syncStatusDiv.className = pendingRecords.length ? 'sync-status syncing' : 'sync-status online';
+        syncStatusDiv.innerHTML = !isOnline ? `🔴 离线 <span class="badge">${pendingRecords.length}</span>` : pendingRecords.length ? `🟡 待同步 <span class="badge">${pendingRecords.length}</span>` : '🟢 在线';
+    }
+    window.addEventListener('online', () => { isOnline=true; updateSyncStatusUI(); if (!isLocalMode && currentUser) syncPendingRecords(); });
+    window.addEventListener('offline', () => { isOnline=false; updateSyncStatusUI(); });
+
+    async function syncPendingRecords() {
+        if (isLocalMode || !currentUser || !isOnline || pendingRecords.length===0) return;
+        syncStatusDiv.innerHTML = '🟡 同步中...';
+        for (const record of pendingRecords) {
+            try {
+                const { error } = await sbClient.from('scans').insert([{
+                    tracking_number: record.tracking_number,
+                    carrier: record.carrier,
+                    notes: record.notes || '',
+                    photo_url: record.photo_url || null,
+                    scanned_at: record.scanned_at,
+                    user_id: currentUser.id
+                }]);
+                if (!error) pendingRecords = pendingRecords.filter(r => r.localId !== record.localId);
+            } catch (e) {}
+        }
+        savePendingToStorage();
+        updateSyncStatusUI();
+        if (dataSourceMode !== 'local') await loadCloudData();
+        applyDataSource();
+        speak('同步完成');
     }
 
-    // ================== 用户管理（通过 Edge Function）==================
-    async function loadUsers() {
-        if (!isAdmin(currentUser)) return;
+    async function loadCloudData() {
+        if (isLocalMode || !currentUser) return;
         try {
-            const { data, error } = await sbClient.functions.invoke('clever-action', { method: 'GET' });
+            const { data, error } = await sbClient.from('scans').select('*').eq('user_id', currentUser.id).order('scanned_at', { ascending: false });
             if (error) throw error;
-            allUsers = data.users || [];
-            renderUsersPage();
-        } catch (err) {
-            console.error('加载用户列表失败', err);
-            showToast('加载用户列表失败：' + err.message, 'error');
-        }
+            cloudData = (data || []).map(item => ({ ...item, localId: null, pending: false }));
+            cloudDataLoaded = true;
+        } catch (err) { console.error('加载云端数据失败', err); showToast('加载云端数据失败', 'error'); }
     }
 
-    function renderUsersPage() {
-        const totalPages = Math.ceil(allUsers.length / usersPageSize) || 1;
-        if (usersCurrentPage < 1) usersCurrentPage = 1;
-        if (usersCurrentPage > totalPages) usersCurrentPage = totalPages;
-        const start = (usersCurrentPage - 1) * usersPageSize;
-        const end = start + usersPageSize;
-        const pageUsers = allUsers.slice(start, end);
-        renderUsersTable(pageUsers);
-        usersPageInfo.innerText = `第 ${usersCurrentPage} 页 / 共 ${totalPages} 页`;
-        prevUsersPageBtn.disabled = usersCurrentPage <= 1;
-        nextUsersPageBtn.disabled = usersCurrentPage >= totalPages;
-    }
-
-    function renderUsersTable(users) {
-        if (users.length === 0) {
-            usersTableBody.innerHTML = '';
-            noUsersMsg.style.display = 'block';
-            return;
-        }
-        noUsersMsg.style.display = 'none';
-        usersTableBody.innerHTML = users.map(u => `
-            <tr>
-                <td>${escapeHtml(u.email)}</td>
-                <td>${u.created_at ? new Date(u.created_at).toLocaleString() : ''}</td>
-                <td>${u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleString() : '未登录'}</td>
-                <td>
-                    <button class="btn btn-sm edit-user" data-id="${u.id}" data-email="${escapeHtml(u.email)}">✏️ 编辑</button>
-                    <button class="btn btn-sm reset-pwd" data-id="${u.id}">🔑 重置密码</button>
-                    <button class="delete-user-btn" data-id="${u.id}" title="删除用户" style="background:none; border:none; color:#ef4444; font-size:1.2rem; cursor:pointer;">🗑️</button>
-                </td>
-            </tr>
-        `).join('');
-
-        // 绑定编辑事件
-        document.querySelectorAll('.edit-user').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = btn.dataset.id;
-                const email = btn.dataset.email;
-                openEditUserModal(id, email);
-            });
-        });
-
-        // 绑定重置密码事件
-        document.querySelectorAll('.reset-pwd').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const id = btn.dataset.id;
-                const newPwd = prompt('请输入新密码（至少6位）');
-                if (newPwd && newPwd.length >= 6) {
-                    try {
-                        await sbClient.functions.invoke(`clever-action/${id}`, {
-                            method: 'PUT',
-                            body: { password: newPwd }
-                        });
-                        showToast('密码已重置', 'success');
-                        loadUsers();
-                    } catch (err) {
-                        showToast(err.message, 'error');
-                    }
-                } else if (newPwd) {
-                    showToast('密码至少6位', 'warning');
-                }
-            });
-        });
-
-        // 绑定删除事件
-        document.querySelectorAll('.delete-user-btn').forEach(btn => {
-            btn.addEventListener('click', async (e) => {
-                const id = e.target.dataset.id;
-                if (!confirm('确定要删除该用户吗？此操作不可撤销。')) return;
-                try {
-                    await sbClient.functions.invoke(`clever-action/${id}`, {
-                        method: 'DELETE'
-                    });
-                    showToast('用户已删除', 'success');
-                    loadUsers();
-                } catch (err) {
-                    showToast(err.message, 'error');
-                }
-            });
-        });
-    }
-
-    // 新增用户
-    addUserBtn.addEventListener('click', () => {
-        userModalTitle.innerText = '新增用户';
-        userEmail.value = '';
-        userPassword.value = '';
-        userModal.classList.add('show');
-    });
-
-    // 编辑用户
-    function openEditUserModal(id, email) {
-        userModalTitle.innerText = '编辑用户';
-        userEmail.value = email;
-        userPassword.value = '';
-        userModal.dataset.editId = id;
-        userModal.classList.add('show');
-    }
-
-    cancelUserBtn.addEventListener('click', () => {
-        userModal.classList.remove('show');
-    });
-
-    saveUserBtn.addEventListener('click', async () => {
-        const email = userEmail.value.trim();
-        const password = userPassword.value.trim();
-        const isEdit = userModalTitle.innerText.includes('编辑');
-        const id = userModal.dataset.editId;
-
-        if (!email) {
-            showToast('邮箱不能为空', 'warning');
-            return;
-        }
-
-        try {
-            if (isEdit) {
-                const updates = { email };
-                if (password) updates.password = password;
-                await sbClient.functions.invoke(`clever-action/${id}`, {
-                    method: 'PUT',
-                    body: updates
-                });
-                showToast('用户更新成功', 'success');
-            } else {
-                if (!password || password.length < 6) {
-                    showToast('密码至少6位', 'warning');
-                    return;
-                }
-                await sbClient.functions.invoke('clever-action', {
-                    method: 'POST',
-                    body: { email, password }
-                });
-                showToast('用户创建成功', 'success');
+    // ================== 分组 ==================
+    function groupRecords(records) {
+        const groups = {};
+        records.forEach(rec => {
+            const num = rec.tracking_number;
+            if (!groups[num]) {
+                groups[num] = { tracking_number: num, records: [], carrier: rec.carrier, first_time: rec.scanned_at, last_time: rec.scanned_at, count:0 };
             }
-            userModal.classList.remove('show');
-            loadUsers();
-        } catch (err) {
-            showToast(err.message, 'error');
-        }
-    });
-
-    // 用户分页
-    prevUsersPageBtn.addEventListener('click', () => {
-        if (usersCurrentPage > 1) {
-            usersCurrentPage--;
-            renderUsersPage();
-        }
-    });
-    nextUsersPageBtn.addEventListener('click', () => {
-        const totalPages = Math.ceil(allUsers.length / usersPageSize);
-        if (usersCurrentPage < totalPages) {
-            usersCurrentPage++;
-            renderUsersPage();
-        }
-    });
-
-    // ================== 账户设置 ==================
-    async function updateEmail(email) {
-        const { error } = await sbClient.auth.updateUser({ email });
-        if (error) throw error;
-        showToast('邮箱修改成功，请查收确认邮件', 'success');
-    }
-
-    async function updatePassword(oldPwd, newPwd) {
-        const { error: signInError } = await sbClient.auth.signInWithPassword({
-            email: currentUser.email,
-            password: oldPwd
+            groups[num].records.push(rec);
+            if (new Date(rec.scanned_at) < new Date(groups[num].first_time)) groups[num].first_time = rec.scanned_at;
+            if (new Date(rec.scanned_at) > new Date(groups[num].last_time)) {
+                groups[num].last_time = rec.scanned_at;
+                groups[num].carrier = rec.carrier;
+            }
+            groups[num].count++;
         });
-        if (signInError) throw new Error('当前密码错误');
-        const { error } = await sbClient.auth.updateUser({ password: newPwd });
-        if (error) throw error;
-        showToast('密码修改成功', 'success');
+        return Object.values(groups).sort((a,b) => new Date(b.last_time) - new Date(a.last_time));
     }
 
-    settingsBtn.addEventListener('click', () => {
-        newEmail.value = '';
-        oldPassword.value = '';
-        newPassword.value = '';
-        confirmPassword.value = '';
-        settingsModal.classList.add('show');
-    });
-
-    cancelSettingsBtn.addEventListener('click', () => {
-        settingsModal.classList.remove('show');
-    });
-
-    saveSettingsBtn.addEventListener('click', async () => {
-        const email = newEmail.value.trim();
-        const oldPwd = oldPassword.value.trim();
-        const newPwd = newPassword.value.trim();
-        const confirmPwd = confirmPassword.value.trim();
-
-        if (!email && !oldPwd && !newPwd) {
-            showToast('请填写要修改的内容', 'warning');
-            return;
+    // ================== 数据源应用 ==================
+    function applyDataSource() {
+        let baseRecords = [];
+        if (isLocalMode) baseRecords = pendingRecords;
+        else {
+            const combined = [...pendingRecords];
+            if (cloudDataLoaded) combined.push(...cloudData);
+            baseRecords = combined;
         }
-        if (newPwd || oldPwd || confirmPwd) {
-            if (!oldPwd || !newPwd || !confirmPwd) {
-                showToast('修改密码需填写所有密码字段', 'warning');
-                return;
-            }
-            if (newPwd.length < 6) {
-                showToast('新密码至少6位', 'warning');
-                return;
-            }
-            if (newPwd !== confirmPwd) {
-                showToast('两次新密码不一致', 'warning');
-                return;
-            }
-        }
-
-        try {
-            if (newPwd) await updatePassword(oldPwd, newPwd);
-            if (email && email !== currentUser.email) await updateEmail(email);
-            else if (email === currentUser.email) showToast('新邮箱与当前相同', 'warning');
-            if (!email && !newPwd) showToast('没有要修改的内容', 'warning');
-            settingsModal.classList.remove('show');
-        } catch (err) {
-            showToast(err.message, 'error');
-        }
-    });
-
-    // ================== 选项卡切换 ==================
-    function switchTab(tab) {
-        if (tab === 'data') {
-            tabDataBtn.classList.add('active');
-            tabUsersBtn.classList.remove('active');
-            dataPanel.style.display = 'block';
-            usersPanel.style.display = 'none';
+        if (dataSourceMode === 'local') {
+            baseRecords = isLocalMode ? pendingRecords : baseRecords.filter(r => new Date(r.scanned_at) >= sessionStartTime);
+        } else if (dataSourceMode === 'cloud') {
+            baseRecords = (isLocalMode || !cloudDataLoaded) ? [] : [...cloudData];
         } else {
-            tabDataBtn.classList.remove('active');
-            tabUsersBtn.classList.add('active');
-            dataPanel.style.display = 'none';
-            usersPanel.style.display = 'block';
-            if (isAdmin(currentUser)) {
-                loadUsers();
+            baseRecords = isLocalMode ? pendingRecords : [...pendingRecords, ...(cloudDataLoaded ? cloudData : [])];
+        }
+        if (searchKeyword) {
+            const kw = searchKeyword.toLowerCase();
+            baseRecords = baseRecords.filter(r => r.tracking_number.toLowerCase().includes(kw) || (r.carrier && r.carrier.toLowerCase().includes(kw)));
+        }
+        groupedRecords = groupRecords(baseRecords);
+        allRecords = baseRecords;
+        renderStats(allRecords);
+        currentPage = 1;
+        renderPage();
+    }
+
+    function renderStats(records) {
+        totalCountSpan.innerText = records.length;
+        uniqueCountSpan.innerText = new Set(records.map(r => r.tracking_number)).size;
+        const carrierCount = {};
+        records.forEach(r => { const c = r.carrier || '未知'; carrierCount[c] = (carrierCount[c]||0)+1; });
+        carrierStatsDiv.innerHTML = Object.entries(carrierCount).map(([n,c]) => `<span class="carrier-stat">${n}: ${c}</span>`).join('');
+    }
+
+    function renderPage() {
+        const totalPages = Math.ceil(groupedRecords.length / pageSize) || 1;
+        if (currentPage<1) currentPage=1; if (currentPage>totalPages) currentPage=totalPages;
+        const start = (currentPage-1)*pageSize;
+        const end = start+pageSize;
+        const pageGroups = groupedRecords.slice(start,end);
+        renderGroupTable(pageGroups);
+        pageInfo.innerText = `第 ${currentPage} 页 / 共 ${totalPages} 页`;
+        prevPageBtn.disabled = currentPage <= 1;
+        nextPageBtn.disabled = currentPage >= totalPages;
+    }
+
+    function renderGroupTable(groups) {
+        if (groups.length === 0) { historyBody.innerHTML = ''; noDataMsg.style.display = 'block'; return; }
+        noDataMsg.style.display = 'none';
+        historyBody.innerHTML = groups.map(group => {
+            const hasPhoto = group.records.some(r => r.photo_url) ? '📸' : '无';
+            return `
+            <tr>
+                <td>${escapeHtml(group.tracking_number)}</td>
+                <td><span class="carrier-badge">${escapeHtml(group.carrier || '未知')}</span></td>
+                <td>${new Date(group.first_time).toLocaleString()}</td>
+                <td>${new Date(group.last_time).toLocaleString()}</td>
+                <td>${group.count}</td>
+                <td>${hasPhoto}</td>
+                <td><button class="detail-btn" data-number="${escapeHtml(group.tracking_number)}">📋 详情</button></td>
+            </tr>
+        `}).join('');
+        document.querySelectorAll('.detail-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                const number = e.target.dataset.number;
+                const group = groupedRecords.find(g => g.tracking_number === number);
+                if (group) showDetailModal(number, group.records);
+            });
+        });
+    }
+
+    async function deleteRecord(localId, cloudId) {
+        if (localId) { pendingRecords = pendingRecords.filter(r => r.localId !== localId); savePendingToStorage(); }
+        if (!isLocalMode && cloudId) {
+            try { await sbClient.from('scans').delete().eq('id', cloudId).eq('user_id', currentUser.id); if (cloudDataLoaded) cloudData = cloudData.filter(r => r.id !== cloudId); }
+            catch (err) { showToast('删除失败', 'error'); return false; }
+        }
+        return true;
+    }
+
+    function findLastScanTime(trackingNumber) {
+        const records = allRecords.filter(r => r.tracking_number === trackingNumber);
+        if (!records.length) return null;
+        records.sort((a,b) => new Date(b.scanned_at) - new Date(a.scanned_at));
+        return new Date(records[0].scanned_at);
+    }
+
+    // ================== 按范围删除 ==================
+    async function clearRecordsByRange() {
+        const range = clearRangeSelect.value;
+        let startTime = null, rangeDesc = '';
+        if (range === 'session') {
+            if (isLocalMode) { showToast('本地模式无法按本次登录删除', 'warning'); return; }
+            if (!sessionStartTime) { showToast('无法确定本次登录时间', 'error'); return; }
+            startTime = sessionStartTime; rangeDesc = '本次扫码';
+        } else if (range === 'day') { startTime = new Date(Date.now()-24*60*60*1000); rangeDesc = '最近一天'; }
+        else if (range === 'week') { startTime = new Date(Date.now()-7*24*60*60*1000); rangeDesc = '最近一周'; }
+        else { startTime = null; rangeDesc = '全部'; }
+
+        let toDelete = startTime ? allRecords.filter(r => new Date(r.scanned_at) >= startTime) : allRecords;
+        if (toDelete.length === 0) { showToast('所选范围内没有记录', 'warning'); return; }
+        if (!confirm(`确定删除 ${rangeDesc} 的 ${toDelete.length} 条记录吗？`)) return;
+
+        if (!isLocalMode && isOnline && currentUser) {
+            try {
+                let query = sbClient.from('scans').delete().eq('user_id', currentUser.id);
+                if (startTime) query = query.gte('scanned_at', startTime.toISOString());
+                await query;
+            } catch (err) { showToast('删除云端失败', 'error'); return; }
+        }
+        if (startTime) pendingRecords = pendingRecords.filter(r => new Date(r.scanned_at) < startTime);
+        else pendingRecords = [];
+        savePendingToStorage();
+        if (!isLocalMode && cloudDataLoaded) await loadCloudData();
+        applyDataSource();
+        updateSyncStatusUI();
+    }
+
+    // ================== 数据源切换 ==================
+    function setDataSource(mode) {
+        dataSourceMode = mode;
+        [dataSourceLocal, dataSourceCloud, dataSourceAll].forEach(btn => btn.classList.remove('active'));
+        if (mode === 'local') dataSourceLocal.classList.add('active');
+        else if (mode === 'cloud') dataSourceCloud.classList.add('active');
+        else dataSourceAll.classList.add('active');
+        if (!isLocalMode && (mode === 'cloud' || mode === 'all') && !cloudDataLoaded) {
+            loadCloudData().then(() => applyDataSource());
+        } else applyDataSource();
+    }
+    dataSourceLocal.addEventListener('click', () => setDataSource('local'));
+    dataSourceCloud.addEventListener('click', () => setDataSource('cloud'));
+    dataSourceAll.addEventListener('click', () => setDataSource('all'));
+
+    // ================== 限制检查（本地2次，当天3次，当月5次）==================
+    async function checkLimits(trackingNumber) {
+        const localCount = pendingRecords.filter(r => r.tracking_number === trackingNumber).length;
+        if (localCount >= 2) {
+            return { allowed: false, reason: '本设备上该单号已扫描2次' };
+        }
+        if (isLocalMode || !isOnline || !currentUser) return { allowed: true };
+        const now = new Date();
+        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        try {
+            const { count: dayCount } = await sbClient
+                .from('scans')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', currentUser.id)
+                .eq('tracking_number', trackingNumber)
+                .gte('scanned_at', startOfDay);
+            const { count: monthCount } = await sbClient
+                .from('scans')
+                .select('*', { count: 'exact', head: true })
+                .eq('user_id', currentUser.id)
+                .eq('tracking_number', trackingNumber)
+                .gte('scanned_at', startOfMonth);
+            if (dayCount >= 3) return { allowed: false, reason: '当天该单号已扫描3次' };
+            if (monthCount >= 5) return { allowed: false, reason: '当月该单号已扫描5次' };
+            return { allowed: true };
+        } catch (err) { return { allowed: true }; }
+    }
+
+    // ================== 拍照上传（按单号命名）==================
+    function getVideoElement() { return document.querySelector('#interactive video'); }
+    async function captureAndUploadPhoto(trackingNumber) {
+        if (!currentUser || isLocalMode) return null;
+        const video = getVideoElement();
+        if (!video || video.readyState < 2) { console.warn('摄像头未就绪'); return null; }
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', 0.8));
+        if (!blob) return null;
+        let existingPhotos = 0;
+        if (cloudDataLoaded) {
+            existingPhotos = cloudData.filter(r => r.tracking_number === trackingNumber && r.photo_url).length;
+        }
+        existingPhotos += pendingRecords.filter(r => r.tracking_number === trackingNumber && r.photo_url).length;
+        const nextNum = existingPhotos + 1;
+        const fileName = `${trackingNumber}/${trackingNumber}-${nextNum}.jpg`;
+        const { error } = await sbClient.storage.from('scan-photos').upload(fileName, blob, { contentType: 'image/jpeg', cacheControl: '3600' });
+        if (error) { console.error('照片上传失败', error); return null; }
+        const { data: { publicUrl } } = sbClient.storage.from('scan-photos').getPublicUrl(fileName);
+        return publicUrl;
+    }
+
+    async function saveScanWithPhoto(trackingNumber, carrier, notes, photoUrl) {
+        if (!currentUser && !isLocalMode) return false;
+        const record = { tracking_number: trackingNumber, carrier, notes, photo_url: photoUrl, scanned_at: new Date().toISOString() };
+        if (!isLocalMode && isOnline && currentUser) {
+            try {
+                await sbClient.from('scans').insert([{ ...record, user_id: currentUser.id }]);
+                if (cloudDataLoaded) await loadCloudData();
+                applyDataSource();
+                return true;
+            } catch (err) {
+                addPendingRecord(record);
+                applyDataSource();
+                return true;
             }
+        } else {
+            addPendingRecord(record);
+            applyDataSource();
+            return true;
         }
     }
 
-    tabDataBtn.addEventListener('click', () => switchTab('data'));
-    tabUsersBtn.addEventListener('click', () => {
-        if (!isAdmin(currentUser)) {
-            showToast('只有管理员可访问用户管理', 'warning');
+    // ================== 处理扫码结果（添加处理中标记防止并发重复）==================
+    async function handleTrackingNumber(trackingNumber) {
+        if (window.processingTrackingNumbers.has(trackingNumber)) {
+            console.log('单号正在处理中，忽略重复触发');
             return;
         }
-        switchTab('users');
+        const now = Date.now();
+        if (trackingNumber === lastScannedCode && now - lastScanTime < 5000) {
+            speak('重复'); vibrate('repeat');
+            showToast('⚠️ 5秒内重复扫码，已忽略', 'warning');
+            return;
+        }
+        window.processingTrackingNumbers.add(trackingNumber);
+        try {
+            lastScannedCode = trackingNumber;
+            lastScanTime = now;
+            const carrier = detectCarrier(trackingNumber);
+            if (!carrier) {
+                speak('错误'); vibrate('error');
+                showToast('❌ 无效的快递单号', 'error');
+                currentResult.style.display = 'none';
+                return;
+            }
+            const limitCheck = await checkLimits(trackingNumber);
+            if (!limitCheck.allowed && !confirm(`⚠️ 限制提醒：${limitCheck.reason}。是否仍然保存？`)) {
+                speak('已取消'); showToast('保存已取消', 'warning'); return;
+            }
+            const note = getCurrentNote();
+            const lastTime = findLastScanTime(trackingNumber);
+            const isDuplicate = lastTime !== null;
+            let photoUrl = null;
+            if (!isLocalMode && isOnline && currentUser) {
+                photoUrl = await captureAndUploadPhoto(trackingNumber);
+                photoHint.innerText = photoUrl ? '📸 已拍照' : '📸 拍照失败';
+            } else {
+                photoHint.innerText = '';
+            }
+            await saveScanWithPhoto(trackingNumber, carrier, note, photoUrl);
+            // 强制刷新主表格
+            applyDataSource();
+            if (isDuplicate) { speak('重复'); vibrate('repeat'); } else { speak('成功'); vibrate('success'); }
+            showScanToast(trackingNumber);
+            currentResult.style.display = 'block';
+            trackingSpan.innerText = trackingNumber;
+            carrierSpan.innerHTML = `<span class="carrier-badge">${carrier}</span>`;
+            scannedAtSpan.innerText = new Date().toLocaleString();
+            duplicateHint.innerText = isDuplicate ? `⏰ 上次扫描：${lastTime.toLocaleString()}` : '';
+            showToast(isDuplicate ? '重复扫描，已保存' : '扫描成功', isDuplicate ? 'warning' : 'success');
+        } finally {
+            window.processingTrackingNumbers.delete(trackingNumber);
+        }
+    }
+
+    function detectCarrier(tn) {
+        for (let r of carrierRules) if (r.regex.test(tn)) return r.name;
+        return null;
+    }
+
+    // ================== 扫码初始化 ==================
+    let quaggaInitialized = false, quaggaInitPending = false;
+    function initScanner(cb) {
+        if (quaggaInitPending) { setTimeout(() => initScanner(cb), 200); return; }
+        quaggaInitPending = true;
+        Quagga.init({
+            inputStream: { name: "Live", type: "LiveStream", target: document.querySelector('#interactive'), constraints: { width: 640, height: 480, facingMode: "environment" } },
+            decoder: { readers: ["code_128_reader","ean_reader","ean_8_reader","code_39_reader","codabar_reader","upc_reader","i2of5_reader"] }
+        }, err => {
+            quaggaInitPending = false;
+            if (err) { showToast('无法启动摄像头', 'error'); if (cb) cb(false); }
+            else { quaggaInitialized = true; if (cb) cb(true); }
+        });
+    }
+    function startScanner() {
+        if (!currentUser && !isLocalMode) return;
+        if (speechEnabled) speak('扫码启动');
+        try { Quagga.stop(); } catch(e) {}
+        quaggaInitialized = false; quaggaInitPending = false;
+        initScanner(success => {
+            if (success) {
+                setTimeout(() => { Quagga.start(); isScanning = true; updateScanButtons(); showToast('扫码已启动', 'success'); }, 100);
+            } else showToast('启动摄像头失败', 'error');
+        });
+    }
+    function pauseScanner() {
+        if (quaggaInitialized && isScanning) {
+            Quagga.stop(); isScanning = false; updateScanButtons();
+            if (speechEnabled) speak('扫码暂停');
+            showToast('扫码已暂停', 'warning');
+        }
+    }
+    function updateScanButtons() {
+        if (isScanning) { startScanBtn.style.display = 'none'; pauseScanBtn.style.display = 'inline-block'; }
+        else { startScanBtn.style.display = 'inline-block'; pauseScanBtn.style.display = 'none'; }
+    }
+    Quagga.onDetected(result => {
+        if (!isScanning || (!currentUser && !isLocalMode)) return;
+        const code = result.codeResult.code;
+        if (code) handleTrackingNumber(code);
     });
 
     // ================== 用户认证 ==================
     function showAuth() {
         authArea.style.display = 'block';
         mainApp.style.display = 'none';
-        logoutBtn.style.display = 'none';
+        userHeader.style.display = 'none';
+        if (quaggaInitialized && isScanning) Quagga.stop();
     }
-
     function showApp(user) {
         authArea.style.display = 'none';
         mainApp.style.display = 'block';
-        logoutBtn.style.display = 'inline-block';
+        userHeader.style.display = 'flex';
         userInfoDiv.innerText = `👤 ${user.email}`;
-        if (isAdmin(user)) {
-            adminFlag.style.display = 'inline';
-            tabUsersBtn.style.display = 'inline-block';
+        if (isLocalMode) {
+            dataSourceCloud.disabled = true;
+            syncStatusDiv.style.display = 'none';
+            localModeBadge.style.display = 'flex';
         } else {
-            adminFlag.style.display = 'none';
-            tabUsersBtn.style.display = 'none';
+            dataSourceCloud.disabled = false;
+            syncStatusDiv.style.display = 'flex';
+            localModeBadge.style.display = 'none';
         }
-        loadData();
+        loadPendingFromStorage();
+        updateScanButtons();
+        loadNoteOptions();
+        noteLocked = false; lockedNote = ''; noteInput.value = ''; updateLockUI();
+        if (isLocalMode) {
+            cloudDataLoaded = false; cloudData = [];
+            applyDataSource();
+        } else {
+            sessionStartTime = new Date();
+            setDataSource('local');
+        }
+    }
+    function enterLocalMode() {
+        currentUser = null;
+        isLocalMode = true;
+        userInfoDiv.innerText = '📱 本地模式';
+        showApp(null);
+    }
+    async function handleLoginSuccess(user) {
+        currentUser = user;
+        isLocalMode = false;
+        sessionStartTime = new Date();
+        showApp(user);
+        if (pendingRecords.length > 0) {
+            speak('开始同步本地记录');
+            await syncPendingRecords();
+        } else loadCloudData();
     }
 
     sbClient.auth.onAuthStateChange((event, session) => {
-        if (session) {
-            currentUser = session.user;
-            showApp(currentUser);
-        } else {
-            currentUser = null;
-            showAuth();
-        }
+        if (session && !isLocalMode) { currentUser = session.user; handleLoginSuccess(currentUser); }
+        else if (!session && !isLocalMode) { currentUser = null; showAuth(); }
     });
-
     sbClient.auth.getSession().then(({ data: { session } }) => {
-        if (session) {
-            currentUser = session.user;
-            showApp(currentUser);
-        } else {
-            showAuth();
-        }
+        if (session) { currentUser = session.user; handleLoginSuccess(currentUser); }
+        else showAuth();
     });
 
     loginBtn.addEventListener('click', async () => {
@@ -1012,28 +1477,85 @@
         }
     });
 
+    signupBtn.addEventListener('click', async () => {
+        const email = signupEmail.value.trim();
+        const password = signupPassword.value;
+        const confirm = signupConfirm.value;
+        if (password !== confirm) { signupError.innerText = '两次密码不一致'; return; }
+        signupError.innerText = '';
+        try {
+            const { error } = await sbClient.auth.signUp({ email, password });
+            if (error) throw error;
+            showToast('注册成功！请登录', 'success');
+            loginTab.click();
+        } catch (err) { signupError.innerText = err.message; }
+    });
+
     logoutBtn.addEventListener('click', async () => {
-        await sbClient.auth.signOut();
+        if (!isLocalMode) { pauseScanner(); await sbClient.auth.signOut(); }
+        currentUser = null; isLocalMode = false; showAuth();
     });
 
-    // ================== 数据管理事件绑定 ==================
-    applyFilterBtn.addEventListener('click', applyFilter);
-    resetFilterBtn.addEventListener('click', resetFilter);
-    exportBtn.addEventListener('click', exportToXLSX);
+    // 登录/注册界面切换
+    loginTab.addEventListener('click', () => {
+        loginTab.classList.add('active'); signupTab.classList.remove('active');
+        loginForm.style.display = 'flex'; signupForm.style.display = 'none';
+        switchToSignup.style.display = 'inline'; switchToLogin.style.display = 'none';
+    });
+    signupTab.addEventListener('click', () => {
+        signupTab.classList.add('active'); loginTab.classList.remove('active');
+        signupForm.style.display = 'flex'; loginForm.style.display = 'none';
+        switchToLogin.style.display = 'inline'; switchToSignup.style.display = 'none';
+    });
+    switchToSignup.addEventListener('click', () => signupTab.click());
+    switchToLogin.addEventListener('click', () => loginTab.click());
+    localModeBtn.addEventListener('click', enterLocalMode);
 
-    prevPageBtn.addEventListener('click', () => {
-        if (currentPage > 1) { currentPage--; renderPage(); }
+    // ================== 其他事件 ==================
+    startScanBtn.addEventListener('click', startScanner);
+    pauseScanBtn.addEventListener('click', pauseScanner);
+    clearRangeBtn.addEventListener('click', clearRecordsByRange);
+    prevPageBtn.addEventListener('click', () => { if (currentPage > 1) { currentPage--; renderPage(); } });
+    nextPageBtn.addEventListener('click', () => { if (currentPage < Math.ceil(groupedRecords.length/pageSize)) { currentPage++; renderPage(); } });
+    syncStatusDiv.addEventListener('click', () => {
+        if (isLocalMode) return;
+        if (isOnline && pendingRecords.length > 0) { speak('开始同步'); syncPendingRecords(); }
+        else if (!isOnline) { speak('离线无法同步'); showToast('当前处于离线状态，无法同步', 'error'); }
+        else { speak('所有记录已同步'); showToast('所有记录已同步', 'success'); }
     });
-    nextPageBtn.addEventListener('click', () => {
-        const totalPages = Math.ceil(filteredRecords.length / pageSize);
-        if (currentPage < totalPages) { currentPage++; renderPage(); }
+    exportCsvBtn.addEventListener('click', async () => {
+        let records = allRecords;
+        if (!records.length) { showToast('暂无数据', 'warning'); return; }
+        const headers = ['单号','快递公司','扫描时间','备注'];
+        const rows = records.map(r => [r.tracking_number, r.carrier||'', new Date(r.scanned_at).toLocaleString(), r.notes||'']);
+        const csv = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+        const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `快递记录_${new Date().toISOString().slice(0,10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    });
+    exportXlsxBtn.addEventListener('click', async () => {
+        let records = allRecords;
+        if (!records.length) { showToast('暂无数据', 'warning'); return; }
+        const data = records.map(r => ({ '单号': r.tracking_number, '快递公司': r.carrier||'', '扫描时间': new Date(r.scanned_at).toLocaleString(), '备注': r.notes||'' }));
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '扫描记录');
+        XLSX.writeFile(wb, `快递记录_${new Date().toISOString().slice(0,10)}.xlsx`);
     });
 
-    // 关闭大图
-    closeImageBtn.addEventListener('click', () => imageModal.classList.remove('show'));
-    imageModal.addEventListener('click', e => {
-        if (e.target === imageModal) imageModal.classList.remove('show');
-    });
+    // ================== 工具函数 ==================
+    function escapeHtml(unsafe) { return unsafe.replace(/[&<>"']/g, m => { if(m==='&') return '&amp;'; if(m==='<') return '&lt;'; if(m==='>') return '&gt;'; if(m==='"') return '&quot;'; if(m==="'") return '&#039;'; return m; }); }
+
+    // 初始化
+    loadPendingFromStorage();
+    loadSoundPreference();
+    if (window.speechSynthesis) {
+        // 预加载语音列表
+        window.speechSynthesis.getVoices();
+    }
 </script>
 </body>
 </html>
